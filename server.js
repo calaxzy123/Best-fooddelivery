@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const db = require('./Database');
+const db = require('./database');
 const { AuthController, FoodController, CartController, OrderController } = require('./Controllers');
 const { OrderRepository } = require('./Repositories');
 
@@ -715,7 +715,15 @@ app.use(express.static(path.join(__dirname, '../')));
 app.use(express.static(path.join(__dirname, './')));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'));
+  res.sendFile(path.join(__dirname, '../index.html'), (err) => {
+    if (err) {
+      res.sendFile(path.join(__dirname, 'index.html'), (innerErr) => {
+        if (innerErr) {
+          res.json({ status: 'API is running', message: 'BestFood Delivery Backend is live!' });
+        }
+      });
+    }
+  });
 });
 
 // Dynamic Port Binding
