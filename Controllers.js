@@ -1,5 +1,5 @@
 // Controllers.js
-const db = require('./Database');
+const db = require('./database');
 const { UserRepository, FoodRepository, CartRepository, OrderRepository } = require('./Repositories');
 
 class AuthController {
@@ -131,7 +131,6 @@ class CartController {
       // ตรวจสอบความถูกต้องของ user_id เพื่อป้องกัน Foreign Key Constraint Fails
       const [uRows] = await pool.query('SELECT id FROM users WHERE id = ?', [targetUserId]);
       if (uRows.length === 0) {
-        // หากไม่พบบัญชี ให้ค้นหาบัญชี customer คนแรกมารับแทนเพื่อป้องกันระบบล่ม
         const [defaultCust] = await pool.query("SELECT id FROM users WHERE role = 'customer' ORDER BY id ASC LIMIT 1");
         if (defaultCust.length > 0) {
           targetUserId = defaultCust[0].id;
