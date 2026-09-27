@@ -27,6 +27,89 @@ const orderLiveLocations = {};
 async function initializeDatabaseTables() {
   try {
     const pool = db.getPool();
+
+    // 1. ตารางผู้ใช้งาน (Users)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'customer',
+        phone VARCHAR(20) DEFAULT '',
+        address TEXT DEFAULT NULL,
+        restaurant_id INT DEFAULT NULL,
+        vehicle_type VARCHAR(50) DEFAULT 'Honda Wave 110i',
+        vehicle_plate VARCHAR(50) DEFAULT '1กข-8888 กทม.',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 2. ตารางร้านค้า (Restaurants)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS restaurants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        owner_id INT DEFAULT 1,
+        name VARCHAR(150) NOT NULL,
+        phone VARCHAR(20) DEFAULT '',
+        address TEXT DEFAULT NULL,
+        status VARCHAR(20) DEFAULT 'open',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 3. ตารางอาหาร (Foods)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS foods (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        restaurant_id INT NOT NULL,
+        name VARCHAR(150) NOT NULL,
+        price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        image VARCHAR(255) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 4. ตารางตะกร้าสินค้า (Carts)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS carts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        food_id INT NOT NULL,
+        restaurant_id INT DEFAULT 1,
+        quantity INT NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 5. ตารางคำสั่งซื้อ (Orders)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        restaurant_id INT NOT NULL,
+        rider_id INT DEFAULT NULL,
+        delivery_address TEXT,
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(30) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 6. ตารางรายการสินค้าในคำสั่งซื้อ (Order Items)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        food_id INT NOT NULL,
+        food_name VARCHAR(150),
+        price DECIMAL(10, 2) NOT NULL,
+        quantity INT NOT NULL DEFAULT 1
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 7. ตารางกระเป๋าเงิน (Wallets)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wallets (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,6 +120,7 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // 8. ตารางประวัติธุรกรรมกระเป๋าเงิน (Wallet Transactions)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wallet_transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -51,14 +135,7 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // ปรับชนิดคอลัมน์ type ให้รองรับทุกประเภทธุรกรรมสำหรับตารางเดิมที่มีอยู่แล้ว
-    try {
-      await pool.query(`ALTER TABLE wallet_transactions MODIFY COLUMN type VARCHAR(50) NOT NULL;`);
-    } catch (e) {
-      // ข้ามหาก schema พร้อมอยู่แล้ว
-    }
-
-    console.log('✅ [Database] โครงสร้างตารางกระเป๋าเงิน (Wallets) พร้อมใช้งาน');
+    console.log('✅ [Database] โครงสร้างตารางทั้งหมดพร้อมใช้งานสมบูรณ์');
   } catch (err) {
     console.error('⚠️ [Database Init Notice]:', err.message);
   }
