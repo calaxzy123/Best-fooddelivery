@@ -1,5 +1,5 @@
 // Repositories.js
-const db = require('./Database');
+const db = require('./database');
 
 // 1. คลังข้อมูลผู้ใช้งาน (User)
 class UserRepository {
