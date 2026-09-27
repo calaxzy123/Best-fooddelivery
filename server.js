@@ -787,16 +787,19 @@ const handleWalletWithdraw = async (req, res) => {
 app.post('/api/wallet/withdraw', handleWalletWithdraw);
 app.post('/wallet/withdraw', handleWalletWithdraw);
 
-// ชี้ตำแหน่งไฟล์หน้าเว็บ Static
+// ชี้ตำแหน่งไฟล์หน้าเว็บ Static (ค้นหาทั้งโฟลเดอร์ปัจจุบันและโฟลเดอร์แม่)
+app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, '../')));
-app.use(express.static(path.join(__dirname, './')));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../index.html'), (err) => {
+  const localIndex = path.join(__dirname, 'index.html');
+  const parentIndex = path.join(__dirname, '../index.html');
+
+  res.sendFile(localIndex, (err) => {
     if (err) {
-      res.sendFile(path.join(__dirname, 'index.html'), (innerErr) => {
-        if (innerErr) {
-          res.json({ status: 'API is running', message: 'BestFood Delivery Backend is live!' });
+      res.sendFile(parentIndex, (err2) => {
+        if (err2) {
+          res.status(404).send('ไม่พบไฟล์ index.html กรุณาตรวจสอบตำแหน่งไฟล์');
         }
       });
     }
