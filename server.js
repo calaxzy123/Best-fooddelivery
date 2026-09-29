@@ -162,11 +162,11 @@ async function processOrderPayout(orderId) {
       return;
     }
 
-    // 2. ดึงข้อมูลออเดอร์และเจ้าของร้าน
+    // 2. ดึงข้อมูลออเดอร์และเจ้าของร้าน (ใช้ LEFT JOIN เพื่อไม่ให้ออเดอร์หลุด)
     const [orders] = await conn.query(
       `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id 
        FROM orders o
-       JOIN restaurants r ON o.restaurant_id = r.id
+       LEFT JOIN restaurants r ON o.restaurant_id = r.id
        WHERE o.id = ?`,
       [orderId]
     );
@@ -175,34 +175,50 @@ async function processOrderPayout(orderId) {
     const order = orders[0];
 
     const deliveryFee = 20.00;
-    const foodAmount = Math.max(0, Number(order.total_amount) - deliveryFee);
-    const gpPercent = 0.15;
+    const totalAmount = Number(order.total_amount) || 0;
+    const foodAmount = Math.max(0, totalAmount - deliveryFee);
+    const gpPercent = 0.15; // GP 15%
     const gpFee = foodAmount * gpPercent;
     const merchantNet = Number((foodAmount - gpFee).toFixed(2));
 
     await conn.beginTransaction();
 
-    // 3. จัดสรรเงินให้ร้านค้า
-    if (order.owner_id) {
-      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [order.owner_id]);
-      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, order.owner_id]);
+    // 3. จัดสรรเงินให้ร้านค้า (หากไม่มี owner_id ให้ fallback ไปที่เจ้าของร้านคนแรก)
+    let merchantOwnerId = order.owner_id;
+    if (!merchantOwnerId) {
+      const [defaultOwner] = await conn.query('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
+      merchantOwnerId = (defaultOwner.length > 0 && defaultOwner[0].owner_id) ? defaultOwner[0].owner_id : 1;
+    }
 
-      const [w] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [order.owner_id]);
+    if (merchantOwnerId) {
+      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [merchantOwnerId]);
+      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, merchantOwnerId]);
+
+      const [w] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [merchantOwnerId]);
       if (w.length > 0) {
         await conn.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'order_earning', ?)`,
-          [w[0].id, order.id, merchantNet, `รายได้จากคำสั่งซื้อ #${order.id} (หัก GP 15% เรียบร้อย)`]
+          [w[0].id, order.id, merchantNet, `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${foodAmount} หัก GP 15%)`]
         );
       }
     }
 
-    // 4. จัดสรรเงินค่ารอบให้ไรเดอร์
-    if (order.rider_id) {
-      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [order.rider_id]);
-      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [deliveryFee, order.rider_id]);
+    // 4. จัดสรรเงินค่ารอบให้ไรเดอร์ (20 บาท)
+    let riderUserId = order.rider_id;
+    if (!riderUserId) {
+      // fallback ดึงไรเดอร์คนล่าสุดที่รับงานนี้หากมี
+      const [riderCheck] = await conn.query('SELECT rider_id FROM orders WHERE id = ?', [order.id]);
+      if (riderCheck.length > 0 && riderCheck[0].rider_id) {
+        riderUserId = riderCheck[0].rider_id;
+      }
+    }
 
-      const [rw] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [order.rider_id]);
+    if (riderUserId) {
+      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [riderUserId]);
+      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [deliveryFee, riderUserId]);
+
+      const [rw] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [riderUserId]);
       if (rw.length > 0) {
         await conn.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
@@ -213,7 +229,7 @@ async function processOrderPayout(orderId) {
     }
 
     await conn.commit();
-    console.log(`[Payout Success] ออเดอร์ #${orderId}: ร้านค้า +${merchantNet} บ., ไรเดอร์ +${deliveryFee} บ.`);
+    console.log(`✅ [Payout Success] ออเดอร์ #${orderId}: ร้านค้า (ID: ${merchantOwnerId}) +${merchantNet} บ., ไรเดอร์ (ID: ${riderUserId || 'ไม่มี'}) +${deliveryFee} บ.`);
   } catch (error) {
     if (conn) await conn.rollback();
     console.error('Order Payout Processing Error (Non-Fatal):', error.message);
@@ -339,7 +355,6 @@ app.get('/api/cart/:userId', async (req, res) => {
     const pool = db.getPool();
     const userId = Number(req.params.userId);
 
-    // ใช้ INNER JOIN และคัดกรองเฉพาะสินค้าที่มีชื่อและราคาจริง
     const [rows] = await pool.query(`
       SELECT 
         c.id AS cart_id,
@@ -382,7 +397,6 @@ app.post('/api/cart', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ข้อมูลตะกร้าไม่ครบถ้วน' });
     }
 
-    // ตรวจสอบว่ามีสินค้ารหัสนี้อยู่ในตาราง foods จริงหรือไม่
     const [foodExists] = await pool.query('SELECT id, restaurant_id FROM foods WHERE id = ?', [fid]);
     if (foodExists.length === 0) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการอาหารนี้ในระบบ' });
@@ -481,7 +495,6 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
-    // ล้างตะกร้าของ user ทันทีหลังจากสั่งซื้อสำเร็จ
     await conn.query('DELETE FROM carts WHERE user_id = ?', [userId]);
 
     await conn.commit();
@@ -587,14 +600,14 @@ app.get('/api/rider/orders', async (req, res) => {
   try {
     const pool = db.getPool();
     const [orders] = await pool.query(`
-      SELECT o.id, o.restaurant_id, o.delivery_address, o.payment_method, 
+      SELECT o.id, o.restaurant_id, o.rider_id, o.delivery_address, o.payment_method, 
              o.total_amount, o.status, o.created_at,
              u.name AS customer_name,
              u.phone AS customer_phone,
              r.name AS restaurant_name
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      JOIN restaurants r ON o.restaurant_id = r.id
+      LEFT JOIN restaurants r ON o.restaurant_id = r.id
       WHERE o.status IN ('ready', 'delivering', 'completed')
       ORDER BY o.created_at DESC
       LIMIT 30
@@ -650,36 +663,43 @@ app.get('/api/orders/:id/location', (req, res) => {
   res.json({ success: true, location: loc });
 });
 
-// 8. ปรับสถานะคำสั่งซื้อ & Payout Trigger
+// 8. ปรับสถานะคำสั่งซื้อ & Payout Trigger (รองรับสถานะสำเร็จทุกรูปแบบ)
 app.patch('/api/orders/:id/status', async (req, res) => {
   try {
     const orderId = req.params.id;
-    const { status, rider_id } = req.body;
+    const { status, rider_id, riderId } = req.body;
 
     if (!status) {
       return res.status(400).json({ success: false, message: 'กรุณาระบุสถานะใหม่' });
     }
 
-    await orderRepo.updateStatus(orderId, status);
+    const cleanStatus = String(status).trim().toLowerCase();
+    const finalRiderId = Number(rider_id || riderId);
+    const pool = db.getPool();
 
-    if (rider_id) {
-      const pool = db.getPool();
+    // บันทึก rider_id เข้าตารางคำสั่งซื้อทันทีหากมีการส่งมา
+    if (finalRiderId > 0) {
       try {
-        await pool.query('UPDATE orders SET rider_id = ? WHERE id = ?', [Number(rider_id), orderId]);
+        await pool.query('UPDATE orders SET rider_id = ? WHERE id = ?', [finalRiderId, orderId]);
       } catch (err) {}
     }
 
-    if (status === 'completed' || status === 'cancelled') {
+    await orderRepo.updateStatus(orderId, cleanStatus);
+
+    // รองรับสถานะจบงาน: completed, delivered, success, done
+    const isCompleted = ['completed', 'delivered', 'success', 'done'].includes(cleanStatus);
+
+    if (isCompleted || cleanStatus === 'cancelled') {
       delete orderLiveLocations[orderId];
     }
 
-    if (status === 'completed') {
+    if (isCompleted) {
       await processOrderPayout(orderId);
     }
 
     res.json({
       success: true,
-      message: `อัปเดตสถานะเป็น ${status} เรียบร้อยแล้ว`
+      message: `อัปเดตสถานะเป็น ${cleanStatus} เรียบร้อยแล้ว`
     });
   } catch (error) {
     console.error('Update Status Error:', error);
