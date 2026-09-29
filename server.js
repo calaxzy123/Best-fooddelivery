@@ -791,6 +791,7 @@ app.post('/wallet/withdraw', handleWalletWithdraw);
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, '../')));
 
+// เส้นทางดักหน้าเว็บหลัก
 app.get('/', (req, res) => {
   const localIndex = path.join(__dirname, 'index.html');
   const parentIndex = path.join(__dirname, '../index.html');
@@ -805,6 +806,35 @@ app.get('/', (req, res) => {
     }
   });
 });
+
+// ฟังก์ชันกลางสำหรับส่งไฟล์แบบยืดหยุ่น Case-Insensitive
+function sendHtmlFile(res, fileName1, fileName2) {
+  res.sendFile(path.join(__dirname, fileName1), (err) => {
+    if (err && fileName2) {
+      res.sendFile(path.join(__dirname, fileName2), (err2) => {
+        if (err2) res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+      });
+    } else if (err) {
+      res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+    }
+  });
+}
+
+// เส้นทางรองรับทั้งตัวพิมพ์เล็กและพิมพ์ใหญ่
+app.get('/login.html', (req, res) => sendHtmlFile(res, 'Login.html', 'login.html'));
+app.get('/Login.html', (req, res) => sendHtmlFile(res, 'Login.html', 'login.html'));
+
+app.get('/register.html', (req, res) => sendHtmlFile(res, 'Register.html', 'register.html'));
+app.get('/Register.html', (req, res) => sendHtmlFile(res, 'Register.html', 'register.html'));
+
+app.get('/cart.html', (req, res) => sendHtmlFile(res, 'cart.html'));
+app.get('/checkout.html', (req, res) => sendHtmlFile(res, 'checkout.html'));
+app.get('/order.html', (req, res) => sendHtmlFile(res, 'order.html'));
+app.get('/menu.html', (req, res) => sendHtmlFile(res, 'menu.html'));
+app.get('/merchant.html', (req, res) => sendHtmlFile(res, 'merchant.html'));
+app.get('/rider.html', (req, res) => sendHtmlFile(res, 'rider.html'));
+app.get('/restaurants.html', (req, res) => sendHtmlFile(res, 'restaurants.html'));
+app.get('/restaurant.html', (req, res) => sendHtmlFile(res, 'restaurants.html', 'restaurant.html'));
 
 // Dynamic Port Binding
 const PORT = process.env.PORT || 3000;
