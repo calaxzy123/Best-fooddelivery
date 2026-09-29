@@ -102,7 +102,7 @@
             <h2>🛒 ตะกร้าสินค้า</h2>
 
             <div id="cart-items">
-                <!-- รายการสินค้าจาก Database -->
+                <!-- รายการสินค้า -->
             </div>
 
             <div class="cart-summary">
@@ -131,12 +131,20 @@
     <script src="script.js"></script>
 
     <script>
+        // ปรับแต่ง path รูปภาพให้เชื่อมไปยัง Image/ เสมอ
         function getFoodImage(image) {
             if (!image) return "Image/logoweb.png";
             image = String(image).trim();
             if (image.startsWith("http://") || image.startsWith("https://")) return image;
-            if (image.startsWith("Image/") || image.startsWith("image/")) return image;
-            return "Image/" + image;
+            
+            if (image.startsWith("images/")) {
+                image = image.replace(/^images\//, "Image/");
+            } else if (image.startsWith("image/")) {
+                image = image.replace(/^image\//, "Image/");
+            } else if (!image.startsWith("Image/")) {
+                image = "Image/" + image;
+            }
+            return image;
         }
 
         async function renderCartPage() {
@@ -145,8 +153,9 @@
             const countEl = document.getElementById("cart-count");
 
             const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
 
-            if (!currentUser) {
+            if (!userId) {
                 container.innerHTML = `
                     <div class="empty-cart-msg">
                         <p>กรุณาเข้าสู่ระบบก่อนดูตะกร้าสินค้า</p>
@@ -160,142 +169,154 @@
                 return;
             }
 
+            let cart = [];
+
             try {
-                const response = await fetch(`/api/cart/${currentUser.id}`);
-                const result = await response.json();
-
-                if (!result.success) {
-                    throw new Error(result.message || "ไม่สามารถโหลดตะกร้าได้");
+                const response = await fetch(`/api/cart/${userId}?_t=${Date.now()}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && Array.isArray(result.data)) {
+                        cart = result.data;
+                    }
                 }
-
-                const cart = result.data || [];
-                const totalQty = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-                if (countEl) countEl.textContent = totalQty;
-
-                if (cart.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-cart-msg">
-                            <p>ไม่มีสินค้าในตะกร้าของคุณ 🛒</p>
-                            <a href="restaurants.html" style="display:inline-block; margin-top:10px; color:#10b981; font-weight:bold; text-decoration:none;">
-                                🍔 ไปเลือกร้านอาหาร
-                            </a>
-                        </div>
-                    `;
-                    totalPriceEl.textContent = "0 บาท";
-                    return;
-                }
-
-                let subtotal = 0;
-                container.innerHTML = cart.map(item => {
-                    const price = Number(item.price || 0);
-                    const quantity = Number(item.quantity || 1);
-                    const itemTotal = price * quantity;
-                    subtotal += itemTotal;
-                    const image = getFoodImage(item.image);
-
-                    return `
-                        <div class="cart-item-card">
-                            <div class="cart-item-info">
-                                <img src="${image}" class="cart-item-img" alt="${item.name}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
-                                <div>
-                                    <h3 style="margin:0 0 5px 0;">${item.name}</h3>
-                                    <span style="color:#6b7280;">฿${price.toLocaleString()}</span>
-                                </div>
-                            </div>
-
-                            <div style="display:flex; align-items:center; gap:1.2rem;">
-                                <div style="display:inline-flex; align-items:center; gap:8px; background:#f3f4f6; padding:4px 8px; border-radius:6px; border:1px solid #ddd;">
-                                    <button type="button" onclick="decreaseCartItem(${item.food_id})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
-                                    <span style="font-weight:bold; min-width:26px; text-align:center; font-size:16px; color:#111;">${quantity}</span>
-                                    <button type="button" onclick="increaseCartItem(${item.food_id})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
-                                </div>
-                                <strong style="min-width:85px; text-align:right; font-size:1.05rem; color:#111;">${itemTotal.toLocaleString()} ฿</strong>
-                            </div>
-                        </div>
-                    `;
-                }).join("");
-
-                totalPriceEl.textContent = `${subtotal.toLocaleString()} บาท`;
-
             } catch (error) {
-                console.error("Cart Error:", error);
+                console.warn("โหลดตะกร้าจาก API ไม่สำเร็จ ดึงจากแคชสำรอง");
+                try {
+                    cart = JSON.parse(localStorage.getItem(`cart_${userId}`) || localStorage.getItem("cart") || "[]");
+                } catch (e) {
+                    cart = [];
+                }
+            }
+
+            // จุดสำคัญ: กรองคัดแถว null, undefined หรือแถวที่ไม่มีชื่อ/ราคา เป็น 0 ทิ้งออกให้หมด 100%
+            cart = cart.filter(item => {
+                if (!item) return false;
+                const name = String(item.name || item.food_name || "").trim();
+                const price = Number(item.price || item.food_price || 0);
+                const foodId = Number(item.food_id || item.foodId || item.id || 0);
+                return foodId > 0 && name !== "" && name.toLowerCase() !== "null" && price > 0;
+            });
+
+            // คำนวณจำนวนชิ้นจริง
+            const totalQty = cart.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+            if (countEl) countEl.textContent = totalQty;
+
+            if (cart.length === 0) {
                 container.innerHTML = `
                     <div class="empty-cart-msg">
-                        <p>❌ ไม่สามารถโหลดตะกร้าได้</p>
+                        <p>ไม่มีสินค้าในตะกร้าของคุณ 🛒</p>
+                        <a href="restaurants.html" style="display:inline-block; margin-top:10px; color:#10b981; font-weight:bold; text-decoration:none;">
+                            🍔 ไปเลือกร้านอาหาร
+                        </a>
                     </div>
                 `;
                 totalPriceEl.textContent = "0 บาท";
+                return;
             }
+
+            let subtotal = 0;
+            container.innerHTML = cart.map(item => {
+                const foodId = item.food_id || item.foodId || item.id;
+                const name = item.name || item.food_name;
+                const price = Number(item.price || item.food_price || 0);
+                const quantity = Number(item.quantity || 1);
+                const itemTotal = price * quantity;
+                subtotal += itemTotal;
+                const image = getFoodImage(item.image);
+
+                return `
+                    <div class="cart-item-card">
+                        <div class="cart-item-info">
+                            <img src="${image}" class="cart-item-img" alt="${name}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                            <div>
+                                <h3 style="margin:0 0 5px 0;">${name}</h3>
+                                <span style="color:#6b7280;">฿${price.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:1.2rem;">
+                            <div style="display:inline-flex; align-items:center; gap:8px; background:#f3f4f6; padding:4px 8px; border-radius:6px; border:1px solid #ddd;">
+                                <button type="button" onclick="decreaseCartItem(${foodId})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
+                                <span style="font-weight:bold; min-width:26px; text-align:center; font-size:16px; color:#111;">${quantity}</span>
+                                <button type="button" onclick="increaseCartItem(${foodId})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
+                            </div>
+                            <strong style="min-width:85px; text-align:right; font-size:1.05rem; color:#111;">${itemTotal.toLocaleString()} ฿</strong>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+            totalPriceEl.textContent = `${subtotal.toLocaleString()} บาท`;
         }
 
         async function increaseCartItem(foodId) {
             const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-            if (!currentUser) return;
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+            if (!userId) return;
 
             try {
                 const response = await fetch("/api/cart", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        user_id: currentUser.id,
-                        food_id: foodId,
+                        user_id: Number(userId),
+                        food_id: Number(foodId),
                         quantity: 1
                     })
                 });
-
                 const result = await response.json();
                 if (result.success) {
                     await renderCartPage();
                     if (window.cartManager) await window.cartManager.updateCartBadge();
                 }
             } catch (error) {
-                alert("ไม่สามารถเพิ่มจำนวนสินค้าได้");
+                console.error("เพิ่มจำนวนสินค้าไม่สำเร็จ:", error);
             }
         }
 
         async function decreaseCartItem(foodId) {
             const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-            if (!currentUser) return;
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+            if (!userId) return;
 
             try {
                 const response = await fetch("/api/cart", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        user_id: currentUser.id,
-                        food_id: foodId,
+                        user_id: Number(userId),
+                        food_id: Number(foodId),
                         quantity: -1
                     })
                 });
-
                 const result = await response.json();
                 if (result.success) {
                     await renderCartPage();
                     if (window.cartManager) await window.cartManager.updateCartBadge();
                 }
             } catch (error) {
-                alert("ไม่สามารถลดจำนวนสินค้าได้");
+                console.error("ลดจำนวนสินค้าไม่สำเร็จ:", error);
             }
         }
 
         async function clearCart() {
             const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-            if (!currentUser) return;
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+            if (!userId) return;
 
             if (!confirm("คุณต้องการล้างสินค้าทั้งหมดในตะกร้าหรือไม่?")) return;
 
+            localStorage.removeItem(`cart_${userId}`);
+            localStorage.removeItem("cart");
+
             try {
-                const response = await fetch(`/api/cart/${currentUser.id}`, {
-                    method: "DELETE"
-                });
-                const result = await response.json();
-                if (result.success) {
-                    await renderCartPage();
-                    if (window.cartManager) await window.cartManager.updateCartBadge();
-                }
+                await fetch(`/api/cart/${userId}`, { method: "DELETE" });
             } catch (error) {
-                alert("ล้างตะกร้าไม่สำเร็จ");
+                console.error("ล้างตะกร้าไม่สำเร็จ:", error);
             }
+
+            await renderCartPage();
+            if (window.cartManager) await window.cartManager.updateCartBadge();
         }
 
         function checkout() {
