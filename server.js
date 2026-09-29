@@ -333,19 +333,30 @@ app.patch('/api/restaurants/:id', async (req, res) => {
 
 app.get('/api/restaurants/:id/foods', (req, res) => foodController.getFoodsByRestaurant(req, res));
 
-// 3. เส้นทางตะกร้าสินค้า (Cart)
+// 3. เส้นทางตะกร้าสินค้า (Cart) - ปรับปรุง INNER JOIN และตัดค่า NULL
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const pool = db.getPool();
-    const userId = req.params.userId;
+    const userId = Number(req.params.userId);
 
+    // ใช้ INNER JOIN และคัดกรองเฉพาะสินค้าที่มีชื่อและราคาจริง
     const [rows] = await pool.query(`
-      SELECT c.*, 
-             COALESCE(c.restaurant_id, f.restaurant_id) AS restaurant_id,
-             f.name, f.price, f.image
+      SELECT 
+        c.id AS cart_id,
+        c.id,
+        c.user_id,
+        c.food_id,
+        c.quantity,
+        COALESCE(c.restaurant_id, f.restaurant_id) AS restaurant_id,
+        f.name, 
+        f.price, 
+        f.image
       FROM carts c
-      LEFT JOIN foods f ON c.food_id = f.id
-      WHERE c.user_id = ?
+      INNER JOIN foods f ON c.food_id = f.id
+      WHERE c.user_id = ? 
+        AND f.name IS NOT NULL 
+        AND f.name != ''
+      ORDER BY c.id ASC
     `, [userId]);
 
     res.json({ success: true, data: rows, items: rows });
@@ -371,6 +382,14 @@ app.post('/api/cart', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ข้อมูลตะกร้าไม่ครบถ้วน' });
     }
 
+    // ตรวจสอบว่ามีสินค้ารหัสนี้อยู่ในตาราง foods จริงหรือไม่
+    const [foodExists] = await pool.query('SELECT id, restaurant_id FROM foods WHERE id = ?', [fid]);
+    if (foodExists.length === 0) {
+      return res.status(404).json({ success: false, message: 'ไม่พบรายการอาหารนี้ในระบบ' });
+    }
+
+    const finalRid = rid > 0 ? rid : foodExists[0].restaurant_id;
+
     const [exists] = await pool.query('SELECT id, quantity FROM carts WHERE user_id = ? AND food_id = ?', [uid, fid]);
 
     if (exists.length > 0) {
@@ -381,14 +400,6 @@ app.post('/api/cart', async (req, res) => {
         await pool.query('UPDATE carts SET quantity = ? WHERE id = ?', [newQty, exists[0].id]);
       }
     } else {
-      let finalRid = rid;
-      if (!finalRid || finalRid === 0) {
-        const [foodRows] = await pool.query('SELECT restaurant_id FROM foods WHERE id = ?', [fid]);
-        if (foodRows.length > 0) {
-          finalRid = foodRows[0].restaurant_id;
-        }
-      }
-
       await pool.query(
         'INSERT INTO carts (user_id, food_id, restaurant_id, quantity) VALUES (?, ?, ?, ?)',
         [uid, fid, finalRid || 1, qty]
@@ -469,6 +480,9 @@ app.post('/api/orders', async (req, res) => {
         );
       }
     }
+
+    // ล้างตะกร้าของ user ทันทีหลังจากสั่งซื้อสำเร็จ
+    await conn.query('DELETE FROM carts WHERE user_id = ?', [userId]);
 
     await conn.commit();
 
@@ -787,9 +801,12 @@ const handleWalletWithdraw = async (req, res) => {
 app.post('/api/wallet/withdraw', handleWalletWithdraw);
 app.post('/wallet/withdraw', handleWalletWithdraw);
 
-// ชี้ตำแหน่งไฟล์หน้าเว็บ Static (ค้นหาทั้งโฟลเดอร์ปัจจุบันและโฟลเดอร์แม่)
+// ชี้ตำแหน่งไฟล์หน้าเว็บ Static (รองรับโฟลเดอร์รูปภาพ Image/ และ images/)
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, '../')));
+app.use('/Image', express.static(path.join(__dirname, '../Image')));
+app.use('/image', express.static(path.join(__dirname, '../Image')));
+app.use('/images', express.static(path.join(__dirname, '../Image')));
 
 // เส้นทางดักหน้าเว็บหลัก
 app.get('/', (req, res) => {
@@ -812,10 +829,18 @@ function sendHtmlFile(res, fileName1, fileName2) {
   res.sendFile(path.join(__dirname, fileName1), (err) => {
     if (err && fileName2) {
       res.sendFile(path.join(__dirname, fileName2), (err2) => {
-        if (err2) res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+        if (err2) {
+          const parentFile = path.join(__dirname, '../', fileName1);
+          res.sendFile(parentFile, (err3) => {
+            if (err3) res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+          });
+        }
       });
     } else if (err) {
-      res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+      const parentFile = path.join(__dirname, '../', fileName1);
+      res.sendFile(parentFile, (err3) => {
+        if (err3) res.status(404).send(`ไม่พบไฟล์ ${fileName1}`);
+      });
     }
   });
 }
