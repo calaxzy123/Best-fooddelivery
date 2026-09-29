@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เมนูอาหาร - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<header class="main-header">
+    <div class="header-container">
+        <h1 class="logo">🍴 BestFood Delivery</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="restaurants.html">ร้านอาหาร</a>
+            <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+            <a href="order.html">📦 คำสั่งซื้อ</a>
+            <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div>
+            <h2 id="storeTitle" style="margin: 0;">กำลังโหลดชื่อร้าน...</h2>
+            <p id="storeDesc" style="margin: 5px 0 0 0; color: #64748b;">เมนูแนะนำประจำร้าน</p>
+        </div>
+        <a href="restaurants.html" style="color: #10b981; font-weight: bold; text-decoration: none;">← เลือกร้านอื่น</a>
+    </div>
+
+    <section class="food-grid" id="food-list">
+        <p>กำลังโหลดเมนู...</p>
+    </section>
+</main>
+
+<footer>
+    <p>© 2026 Food Delivery</p>
+</footer>
+
+<script src="script.js"></script>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const restaurantId = parseInt(urlParams.get("restaurantId")) || 1;
+
+    const storeInfo = {
+        1: { title: "🍛 ร้านกะเพราอร่อย", desc: "อาหารตามสั่ง อาหารไทย รสจัดจ้าน" },
+        2: { title: "🍕 Pizza House", desc: "พิซซ่าเตาถ่าน แป้งหนานุ่ม ชีสเยิ้ม" },
+        3: { title: "🍔 Burger Station", desc: "เบอร์เกอร์เนื้อพรีเมียม ขนมปังบริออช" },
+        4: { title: "🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย", desc: "ก๋วยเตี๋ยวน้ำตกเข้มข้น จัดจ้านไม่ต้องปรุง" }
+    };
+
+    const currentStore = storeInfo[restaurantId] || { title: `🏪 ร้านอาหารรหัส #${restaurantId}`, desc: "เมนูอาหารทั้งหมด" };
+    document.getElementById("storeTitle").innerText = currentStore.title;
+    document.getElementById("storeDesc").innerText = currentStore.desc;
+    document.title = `${currentStore.title} - BestFood Delivery`;
+
+    function formatFoodImage(imagePath) {
+        if (!imagePath) return "Image/logoweb.png";
+        imagePath = String(imagePath).trim();
+        if (imagePath.startsWith("http://") || imagePath.startsWith("https://") || imagePath.startsWith("Image/") || imagePath.startsWith("image/")) {
+            return imagePath;
+        }
+        return "Image/" + imagePath;
+    }
+
+    fetch(`/api/restaurants/${restaurantId}/foods?_t=${Date.now()}`, { cache: "no-store" })
+        .then(response => response.json())
+        .then(result => {
+            const foodList = document.getElementById("food-list");
+            const foods = result.data || result.foods || [];
+
+            if (!result.success || foods.length === 0) {
+                foodList.innerHTML = "<p>ยังไม่มีเมนูอาหารสำหรับร้านนี้</p>";
+                return;
+            }
+
+            foodList.innerHTML = "";
+            foods.forEach(food => {
+                const imageUrl = formatFoodImage(food.image);
+                const foodCard = document.createElement("article");
+                foodCard.className = "food-card";
+                
+                foodCard.innerHTML = `
+                    <img src="${imageUrl}" alt="${food.name}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    <div class="food-info">
+                        <h3>${food.name}</h3>
+                        <p>${food.description || ""}</p>
+                        <strong>${Number(food.price).toLocaleString()} บาท</strong>
+                        <button type="button" class="btn-add-cart">
+                            เพิ่มลงตะกร้า
+                        </button>
+                    </div>
+                `;
+
+                const btn = foodCard.querySelector(".btn-add-cart");
+                btn.addEventListener("click", () => {
+                    if (typeof addToCart === "function") {
+                        addToCart(food.name, food.price, imageUrl, restaurantId, food.id);
+                    }
+                });
+
+                foodList.appendChild(foodCard);
+            });
+        })
+        .catch(error => {
+            console.error("เกิดข้อผิดพลาดในการโหลดเมนู:", error);
+            document.getElementById("food-list").innerHTML = "<p>ไม่สามารถโหลดเมนูอาหารได้</p>";
+        });
+</script>
+
+</body>
+</html>

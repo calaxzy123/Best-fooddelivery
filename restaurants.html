@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ร้านอาหาร - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<header class="main-header">
+    <div class="header-container">
+        <h1 class="logo">🍴 BestFood Delivery</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="restaurants.html">ร้านอาหาร</a>
+            <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+            <a href="order.html">📦 คำสั่งซื้อ</a>
+            <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+        </nav>
+    </div>
+</header>
+
+<main style="max-width: 1100px; margin: 30px auto; padding: 0 20px;">
+
+    <h2>🍽️ ร้านอาหารทั้งหมด</h2>
+    <p style="color: #6c757d; margin-bottom: 25px;">รวมร้านเด็ดรสชาติอร่อย ส่งตรงถึงหน้าบ้านคุณ</p>
+
+    <section class="restaurant-grid">
+
+        <!-- 1. ร้านกะเพราอร่อย -->
+        <article class="restaurant-card">
+            <div class="restaurant-image">
+                <img src="Image/logokapao.jpg" alt="ร้านกะเพราอร่อย" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            </div>
+            <div class="restaurant-content">
+                <h3>ร้านกะเพราอร่อย</h3>
+                <p>อาหารไทย อร่อยไม่ซ้ำ เพิ่งหัดทำวันแรก</p>
+                <p>⭐ 4.8</p>
+                <p>ค่าส่ง ฿20</p>
+                <a href="menu.html" class="btn">ดูเมนู</a>
+            </div>
+        </article>
+
+        <!-- 2. Pizza House -->
+        <article class="restaurant-card">
+            <div class="restaurant-image">
+                <img src="Image/logopizza.png" alt="Pizza House" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            </div>
+            <div class="restaurant-content">
+                <h3>Pizza House</h3>
+                <p>Pizza อร่อยเต็มเปี่ยม โซเดียมเต็มคำ</p>
+                <p>⭐ 4.7</p>
+                <p>ค่าส่ง ฿30</p>
+                <a href="pizza.html" class="btn">ดูเมนู</a>
+            </div>
+        </article>
+
+        <!-- 3. Burger Station -->
+        <article class="restaurant-card">
+            <div class="restaurant-image">
+                <img src="Image/logoburger.jpg" alt="Burger Station" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            </div>
+            <div class="restaurant-content">
+                <h3>Burger Station</h3>
+                <p>Burger รับรองความอร่อย กินง่าย ถ่ายไว</p>
+                <p>⭐ 4.6</p>
+                <p>ค่าส่ง ฿25</p>
+                <a href="burger.html" class="btn">ดูเมนู</a>
+            </div>
+        </article>
+
+        <!-- 4. Noodle Original (แก้ไขรูปเป็น noodle-logo.jpg) -->
+        <article class="restaurant-card">
+            <div class="restaurant-image">
+                <img src="Image/noodle-logo.jpg" alt="Noodle Original" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            </div>
+            <div class="restaurant-content">
+                <h3>Noodle Original</h3>
+                <p>ก๋วยเตี๋ยวอร่อยแบบไม่ต้องปรุง เพราะปรุงไปแล้ว</p>
+                <p>⭐ 4.5</p>
+                <p>ค่าส่ง ฿15</p>
+                <a href="noodles.html" class="btn">ดูเมนู</a>
+            </div>
+        </article>
+
+    </section>
+
+</main>
+
+<footer>
+    <h3>🍴 BestFood Delivery</h3>
+    <p>สั่งอาหารง่าย ๆ ส่งตรงถึงบ้าน</p>
+    <p>© 2026 Food Delivery</p>
+</footer>
+
+<script src="script.js"></script>
+
+</body>
+</html>

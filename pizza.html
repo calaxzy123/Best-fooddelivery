@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza House - เมนู</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<header class="main-header">
+    <div class="header-container">
+        <h1 class="logo">🍴 BestFood Delivery</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="restaurants.html">ร้านอาหาร</a>
+            <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+            <a href="order.html">📦 คำสั่งซื้อ</a>
+            <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <h2>🍕 Pizza House</h2>
+    <p>พิซซ่าอบสดใหม่จากเตา</p>
+
+    <section class="food-grid">
+        <!-- Pepperoni Pizza (ใช้ food_id = 4 ตรงตาม MySQL) -->
+        <article class="food-card">
+            <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>Pepperoni Pizza</h3>
+                <p>พิซซ่าเปปเปอโรนีและชีส</p>
+                <strong>179 บาท</strong>
+                <button type="button" onclick="addToCart('Pepperoni Pizza', 179, 'Image/pepperoni pizza.jpg', 2, 4)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+
+        <!-- Pizza Margherita (ใช้ food_id = 5 ตรงตาม MySQL) -->
+        <article class="food-card">
+            <img src="Image/pizzamargherita.jpg" alt="Pizza Margherita" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>Pizza Margherita</h3>
+                <p>พิซซ่าซอสมะเขือเทศ ชีส และใบโหระพา</p>
+                <strong>159 บาท</strong>
+                <button type="button" onclick="addToCart('Pizza Margherita', 159, 'Image/pizzamargherita.jpg', 2, 5)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+
+        <!-- Hawaiian Pizza (ใช้ food_id = 6 ตรงตาม MySQL) -->
+        <article class="food-card">
+            <img src="Image/pizzahawaiian.jpg" alt="Hawaiian Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>Hawaiian Pizza</h3>
+                <p>แฮม สับปะรด และชีส</p>
+                <strong>189 บาท</strong>
+                <button type="button" onclick="addToCart('Hawaiian Pizza', 189, 'Image/pizzahawaiian.jpg', 2, 6)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+    </section>
+</main>
+
+<footer>
+    <p>© 2026 Food Delivery</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    // อัปเดตสถานะล็อกอินและตะกร้าเบื้องต้นเมื่อเปิดหน้า
+    document.addEventListener("DOMContentLoaded", () => {
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const authNav = document.getElementById("authNav");
+        if (currentUser.id && authNav) {
+            authNav.textContent = `👤 ${currentUser.name || 'โปรไฟล์'}`;
+            authNav.href = currentUser.role === 'restaurant' ? 'merchant.html' : (currentUser.role === 'rider' ? 'rider.html' : 'order.html');
+        }
+    });
+</script>
+
+</body>
+</html>

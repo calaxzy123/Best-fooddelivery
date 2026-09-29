@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ก๋วยเตี๋ยวเรือเจ้าอร่อย</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<header class="main-header">
+    <div class="header-container">
+        <h1 class="logo">🍴 BestFood Delivery</h1>
+        <nav>
+            <a href="index.html">หน้าแรก</a>
+            <a href="restaurants.html">ร้านอาหาร</a>
+            <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+            <a href="order.html">📦 คำสั่งซื้อ</a>
+            <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <h2>🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย</h2>
+    <p>ก๋วยเตี๋ยวรสเข้มข้น เครื่องแน่น</p>
+
+    <section class="food-grid">
+        <!-- 1. ก๋วยเตี๋ยวเรือหมูน้ำตก (food_id = 11, restaurant_id = 4) -->
+        <article class="food-card">
+            <img src="Image/noodle-pork.jpg" alt="ก๋วยเตี๋ยวเรือหมูน้ำตก" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>ก๋วยเตี๋ยวเรือหมูน้ำตก</h3>
+                <p>เส้นเล็ก หมูสด ตับ ลูกชิ้น และน้ำซุปเข้มข้น</p>
+                <strong>45 บาท</strong>
+                <button type="button" onclick="addToCart('ก๋วยเตี๋ยวเรือหมูน้ำตก', 45, 'Image/noodle-pork.jpg', 4, 11)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+
+        <!-- 2. ก๋วยเตี๋ยวเรือเนื้อน้ำตก (food_id = 12, restaurant_id = 4) -->
+        <article class="food-card">
+            <img src="Image/noodle-beef.jpg" alt="ก๋วยเตี๋ยวเรือเนื้อน้ำตก" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>ก๋วยเตี๋ยวเรือเนื้อน้ำตก</h3>
+                <p>เนื้อนุ่ม ลูกชิ้นเนื้อ และน้ำซุปสูตรพิเศษ</p>
+                <strong>55 บาท</strong>
+                <button type="button" onclick="addToCart('ก๋วยเตี๋ยวเรือเนื้อน้ำตก', 55, 'Image/noodle-beef.jpg', 4, 12)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+
+        <!-- 3. ก๋วยเตี๋ยวต้มยำ (food_id = 13, restaurant_id = 4) -->
+        <article class="food-card">
+            <img src="Image/noodle-tomyum.jpg" alt="ก๋วยเตี๋ยวต้มยำ" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>ก๋วยเตี๋ยวต้มยำ</h3>
+                <p>ก๋วยเตี๋ยวต้มยำรสจัด เปรี้ยว เผ็ด หอมมะนาว</p>
+                <strong>65 บาท</strong>
+                <button type="button" onclick="addToCart('ก๋วยเตี๋ยวต้มยำ', 65, 'Image/noodle-tomyum.jpg', 4, 13)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+    </section>
+</main>
+
+<footer>
+    <p>© 2026 Food Delivery</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const authNav = document.getElementById("authNav");
+        if (currentUser.id && authNav) {
+            authNav.textContent = `👤 ${currentUser.name || 'โปรไฟล์'}`;
+            authNav.href = currentUser.role === 'restaurant' ? 'merchant.html' : (currentUser.role === 'rider' ? 'rider.html' : 'order.html');
+        }
+    });
+</script>
+
+</body>
+</html>

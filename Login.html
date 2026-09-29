@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ | BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="header-container">
+            <h1 class="logo">🍴 BestFood Delivery</h1>
+            <nav>
+                <a href="index.html">หน้าแรก</a>
+                <a href="restaurants.html">ร้านอาหาร</a>
+                <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+                <a href="order.html">📦 คำสั่งซื้อ</a>
+                <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main style="max-width: 400px; margin: 40px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <h2>เข้าสู่ระบบ</h2>
+
+        <form id="login-form">
+            <div>
+                <label for="email">Email</label><br>
+                <input type="email" id="email" required placeholder="กรอก Email เช่น admin@fooddelivery.com" style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;">
+            </div>
+            <br>
+            <div>
+                <label for="password">Password</label><br>
+                <input type="password" id="password" required placeholder="กรอกรหัสผ่าน" style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;">
+            </div>
+            <br>
+            <button type="submit" style="width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+                เข้าสู่ระบบ
+            </button>
+        </form>
+
+        <p style="margin-top: 15px; text-align: center;">ยังไม่มีบัญชี? <a href="Register.html">สมัครสมาชิก</a></p>
+    </main>
+
+    <footer>
+        <p>© 2026 Food Delivery</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        const loginForm = document.getElementById("login-form");
+
+        loginForm.addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+
+            try {
+                const response = await fetch("http://localhost:3000/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    alert(data.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+                    return;
+                }
+
+                // 1. บันทึกข้อมูลบัญชีและบทบาทลง localStorage
+                const user = data.user;
+                localStorage.setItem("currentUser", JSON.stringify(user));
+                localStorage.setItem("userId", user.id);
+                localStorage.setItem("userName", user.name);
+                localStorage.setItem("userRole", user.role);
+
+                alert(`ยินดีต้อนรับคุณ ${user.name} (${user.role}) 🎉`);
+
+                // 2. ตรวจสอบบทบาท (Role) แล้วแยกทางไปยังหน้าเว็บของตนเอง
+                const role = (user.role || '').toLowerCase();
+
+                if (role === "admin" || role === "restaurant" || role === "merchant") {
+                    window.location.href = "merchant.html";
+                } else if (role === "rider") {
+                    window.location.href = "rider.html";
+                } else {
+                    window.location.href = "restaurants.html";
+                }
+
+            } catch (error) {
+                console.error("Login Fetch Error:", error);
+                alert("ไม่สามารถเชื่อมต่อกับ Server ได้ กรุณาลองใหม่อีกครั้ง");
+            }
+        });
+    </script>
+</body>
+</html>

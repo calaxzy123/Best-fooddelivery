@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ร้านค้า - BestFood Delivery</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+        .dashboard-container { max-width: 900px; margin: 0 auto; }
+        .order-card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 6px solid #ff9800; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .btn-action { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; margin-top: 10px; }
+        .btn-confirm { background: #2196f3; }
+        .btn-cook { background: #ff9800; }
+        .btn-ready { background: #4caf50; }
+        .item-row { display: flex; justify-content: space-between; padding: 4px 0; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h1>🍳 แผงควบคุมร้านอาหาร (Merchant Dashboard)</h1>
+    <div style="margin-bottom: 15px;">
+        <label><strong>เลือกร้านค้า: </strong></label>
+        <select id="restaurant-select" onchange="fetchRestaurantOrders()">
+            <option value="1">ร้านกะเพราอร่อย (ID: 1)</option>
+            <option value="2">Pizza House (ID: 2)</option>
+            <option value="3">Burger Station (ID: 3)</option>
+            <option value="4">ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)</option>
+        </select>
+    </div>
+
+    <div id="restaurant-orders">กำลังโหลดรายการออเดอร์...</div>
+</div>
+
+<script>
+async function fetchRestaurantOrders() {
+    const restaurantId = document.getElementById("restaurant-select").value;
+    const container = document.getElementById("restaurant-orders");
+
+    try {
+        const res = await fetch(`http://localhost:3000/api/restaurant/orders?restaurant_id=${restaurantId}`);
+        const data = await res.json();
+
+        if (!data.success || !data.orders || data.orders.length === 0) {
+            container.innerHTML = "<p>ยังไม่มีออเดอร์ใหม่สำหรับร้านนี้</p>";
+            return;
+        }
+
+        container.innerHTML = data.orders.map(order => `
+            <div class="order-card">
+                <div class="order-header">
+                    <div>
+                        <h3>ออเดอร์ #${order.id}</h3>
+                        <small>เวลา: ${new Date(order.created_at).toLocaleTimeString('th-TH')}</small>
+                    </div>
+                    <span style="font-weight:bold; color:#e65100;">สถานะ: ${order.status}</span>
+                </div>
+                <div style="margin: 10px 0;">
+                    <p><strong>ผู้สั่ง:</strong> ${order.customer_name} | ที่อยู่: ${order.delivery_address}</p>
+                    <div style="background:#fafafa; padding:10px; border-radius:6px;">
+                        ${order.items.map(i => `
+                            <div class="item-row">
+                                <span>${i.food_name} × ${i.quantity}</span>
+                                <span>${(i.price * i.quantity).toLocaleString()} บาท</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <div>
+                    ${renderMerchantButtons(order.id, order.status)}
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = "<p style='color:red;'>ไม่สามารถเชื่อมต่อ Server ได้</p>";
+    }
+}
+
+function renderMerchantButtons(orderId, status) {
+    if (status === 'pending') {
+        return `<button class="btn-action btn-confirm" onclick="updateStatus(${orderId}, 'confirmed')">1. ยืนยันรับออเดอร์</button>`;
+    }
+    if (status === 'confirmed') {
+        return `<button class="btn-action btn-cook" onclick="updateStatus(${orderId}, 'preparing')">2. เริ่มปรุงอาหาร 🍳</button>`;
+    }
+    if (status === 'preparing') {
+        return `<button class="btn-action btn-ready" onclick="updateStatus(${orderId}, 'ready')">3. ปรุงเสร็จแล้ว (เรียกไรเดอร์) 📦</button>`;
+    }
+    return `<small style="color: #666;">กำลังรอไรเดอร์มารับส่ง (${status})</small>`;
+}
+
+async function updateStatus(orderId, nextStatus) {
+    try {
+        const res = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nextStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+            fetchRestaurantOrders();
+        } else {
+            alert(data.message || "อัปเดตไม่สำเร็จ");
+        }
+    } catch (err) {
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ Server");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    fetchRestaurantOrders();
+    setInterval(fetchRestaurantOrders, 3000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แดชบอร์ดไรเดอร์ - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        .main-header {
+            background: #2563eb;
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header-container {
+            max-width: 950px;
+            margin: auto;
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rider-container {
+            max-width: 950px;
+            margin: 25px auto;
+            padding: 0 15px;
+        }
+        /* แถบโปรไฟล์ไรเดอร์ */
+        .rider-profile-box {
+            background: #fff;
+            padding: 18px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            border-left: 6px solid #2563eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        /* การ์ดกระเป๋าเงินไรเดอร์ */
+        .rider-wallet-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            border-left: 6px solid #10b981;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .btn-withdraw {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-withdraw:hover {
+            background: #059669;
+        }
+        .rider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 18px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+        .order-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            border-left: 6px solid #cbd5e1;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .order-card.ready { border-left-color: #f59e0b; }
+        .order-card.delivering { border-left-color: #3b82f6; }
+        .order-card.completed { border-left-color: #10b981; opacity: 0.85; background: #fcfdfd; }
+        
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 14px;
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 8px;
+            margin: 12px 0;
+            border: 1px solid #edf2f7;
+        }
+        .items-box {
+            font-size: 13px;
+            color: #475569;
+            background: #fff;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px dashed #cbd5e1;
+            margin: 10px 0;
+        }
+        .action-btns {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+            align-items: center;
+        }
+        .btn-rider {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-pickup { background: #2563eb; color: white; }
+        .btn-pickup:hover { background: #1d4ed8; transform: translateY(-1px); }
+        .btn-deliver { background: #10b981; color: white; }
+        .btn-deliver:hover { background: #059669; transform: translateY(-1px); }
+        .btn-refresh { background: #e2e8f0; color: #1e293b; padding: 8px 16px; }
+        .btn-refresh:hover { background: #cbd5e1; }
+        
+        .status-pill {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .pill-ready { background: #fef3c7; color: #92400e; }
+        .pill-delivering { background: #dbeafe; color: #1e40af; }
+        .pill-completed { background: #d1fae5; color: #065f46; }
+
+        .gps-alert {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-container">
+            <h1 style="margin:0; font-size:20px;">🛵 BestFood Rider Hub</h1>
+            <nav style="display:flex; align-items:center; gap:15px;">
+                <span style="font-size:14px;">ไรเดอร์: <b id="riderNameNav">-</b></span>
+                <a href="index.html" style="color:white; text-decoration:none; font-size:14px;">หน้าหลักลูกค้า</a>
+                <button onclick="logout()" style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">ออกจากระบบ</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="rider-container">
+        <!-- การ์ดแสดงโปรไฟล์ไรเดอร์ (Rider Identity Profile) -->
+        <section class="rider-profile-box">
+            <div>
+                <h3 style="margin: 0 0 6px 0; font-size: 18px; color: #0f172a;">
+                    🛵 ไรเดอร์: <span id="rProfileName">กำลังโหลด...</span>
+                </h3>
+                <div style="font-size: 14px; color: #475569; display: flex; gap: 15px; flex-wrap: wrap;">
+                    <span>📞 โทร: <b id="rProfilePhone">-</b></span>
+                    <span>🏍️ พาหนะ: <b id="rProfileVehicle">Honda Wave 110i</b></span>
+                    <span>🔢 ทะเบียน: <b id="rProfilePlate">1กข-8888 กทม.</b></span>
+                </div>
+            </div>
+            <span style="background: #ecfdf5; color: #059669; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; border: 1px solid #a7f3d0;">
+                🟢 ออนไลน์พร้อมรับงาน
+            </span>
+        </section>
+
+        <!-- การ์ดกระเป๋าเงินค่ารอบไรเดอร์ (Rider Wallet Card) -->
+        <section class="rider-wallet-card">
+            <div>
+                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ค่ารอบสะสมในกระเป๋า (รับ 20 บาท/ออเดอร์ เมื่อส่งมอบสำเร็จ)</span>
+                <h2 style="margin: 6px 0 0 0; color: #0f172a; font-size: 2.1rem; letter-spacing: -0.5px;">฿<span id="riderWalletBalance">0.00</span></h2>
+            </div>
+            <div>
+                <button type="button" class="btn-withdraw" onclick="requestRiderWithdrawal()">
+                    💸 ถอนเงินเข้าบัญชี
+                </button>
+            </div>
+        </section>
+
+        <div class="rider-header">
+            <div>
+                <h2 style="margin: 0; font-size: 20px;">📦 รายการงานส่งอาหาร</h2>
+                <p style="margin: 4px 0 0 0; color: #64748b; font-size: 14px;">ออเดอร์ที่ร้านปรุงเสร็จแล้ว พร้อมส่งมอบให้ลูกค้า</p>
+            </div>
+            <button onclick="loadRiderOrders(); loadRiderWallet();" class="btn-rider btn-refresh">🔄 รีเฟรชข้อมูล</button>
+        </div>
+
+        <div id="riderOrdersList">กำลังค้นหาออเดอร์พร้อมส่ง...</div>
+    </main>
+
+    <script>
+        // 1. ตรวจสอบสิทธิ์ผู้ใช้งาน (Rider Role Guard)
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const role = (currentUser.role || '').toLowerCase();
+
+        if (!currentUser.id || (role !== 'rider' && role !== 'admin')) {
+            alert('กรุณาเข้าสู่ระบบด้วยบัญชีไรเดอร์');
+            window.location.href = 'login.html';
+        }
+
+        // แสดงข้อมูลโปรไฟล์
+        document.getElementById('riderNameNav').innerText = `${currentUser.name || 'ไรเดอร์'} (${role})`;
+        document.getElementById('rProfileName').innerText = currentUser.name || 'สมชาย สายซิ่ง';
+        document.getElementById('rProfilePhone').innerText = currentUser.phone || '089-111-2233';
+        document.getElementById('rProfileVehicle').innerText = currentUser.vehicle_type || 'Honda Wave 110i';
+        document.getElementById('rProfilePlate').innerText = currentUser.vehicle_plate || '1กข-8888 กทม.';
+
+        let activeGpsWatchId = null;
+
+        // 2. ดึงยอดเงินกระเป๋าไรเดอร์
+        async function loadRiderWallet() {
+            if (!currentUser.id) return;
+            try {
+                const res = await fetch(`/api/wallet/${currentUser.id}?_t=${Date.now()}`, { cache: "no-store" });
+                const data = await res.json();
+                if (data.success) {
+                    const balanceEl = document.getElementById('riderWalletBalance');
+                    if (balanceEl) {
+                        balanceEl.textContent = Number(data.balance || 0).toLocaleString('th-TH', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Load Rider Wallet Error:", err);
+            }
+        }
+
+        // 3. ฟังก์ชันแจ้งถอนเงินเข้าบัญชี
+        async function requestRiderWithdrawal() {
+            const currentBalance = parseFloat(document.getElementById('riderWalletBalance')?.textContent.replace(/,/g, '') || '0');
+            if (currentBalance <= 0) {
+                alert('ยอดเงินในกระเป๋าของคุณยังไม่เพียงพอสำหรับการถอน');
+                return;
+            }
+
+            const inputAmount = prompt('ยอดเงินที่ถอนได้: ฿' + currentBalance.toFixed(2) + '\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร:', currentBalance.toFixed(2));
+            if (!inputAmount) return;
+
+            const amount = parseFloat(inputAmount);
+            if (isNaN(amount) || amount <= 0) {
+                alert('กรุณากรอกจำนวนเงินให้ถูกต้อง');
+                return;
+            }
+
+            if (amount > currentBalance) {
+                alert('ยอดเงินที่ระบุเกินกว่ายอดเงินคงเหลือในกระเป๋า');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/wallet/withdraw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: Number(currentUser.id), amount: amount })
+                });
+                const result = await res.json();
+                alert(result.message);
+                if (result.success) {
+                    await loadRiderWallet();
+                }
+            } catch (err) {
+                alert('ไม่สามารถทำรายการถอนเงินได้ในขณะนี้');
+            }
+        }
+
+        // 4. ดึงรายการงานส่งอาหาร
+        async function loadRiderOrders() {
+            const container = document.getElementById("riderOrdersList");
+            try {
+                const res = await fetch(`/api/rider/orders?_t=${Date.now()}`, { 
+                    cache: "no-store" 
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server ตอบกลับสถานะ ${res.status}`);
+                }
+
+                const result = await res.json();
+                const orders = result.orders || result.data || [];
+
+                if (orders.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 45px 20px; background: white; border-radius: 12px; color: #64748b; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+                            <div style="font-size: 40px; margin-bottom: 10px;">🛵</div>
+                            <h3 style="margin: 0 0 6px 0; color: #334155;">ยังไม่มีออเดอร์พร้อมส่งในขณะนี้</h3>
+                            <p style="margin: 0; font-size: 14px;">เมื่องานของร้านค้าปรุงเสร็จสิ้น (สถานะ: ready) จะปรากฏขึ้นที่นี่โดยอัตโนมัติ</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = orders.map(ord => {
+                    const isReady = ord.status === 'ready';
+                    const isDelivering = ord.status === 'delivering';
+                    const isCompleted = ord.status === 'completed';
+
+                    let statusBadge = '';
+                    let actionHtml = '';
+                    let gpsAlertHtml = '';
+
+                    if (isReady) {
+                        statusBadge = '<span class="status-pill pill-ready">🍳 ปรุงเสร็จแล้ว (รอรับอาหาร)</span>';
+                        actionHtml = `
+                            <button class="btn-rider btn-pickup" onclick="handleRiderAction(${ord.id}, 'delivering', 'ยืนยันการรับอาหารและเริ่มนำส่งใช่หรือไม่?')">
+                                🛵 1. รับอาหารแล้ว / เริ่มนำส่ง
+                            </button>
+                        `;
+                    } else if (isDelivering) {
+                        statusBadge = '<span class="status-pill pill-delivering">🛵 กำลังนำส่งอาหาร</span>';
+                        gpsAlertHtml = `
+                            <div class="gps-alert">
+                                <span>📡 กำลังแชร์พิกัด GPS สดให้ลูกค้าผ่านแผนที่</span>
+                            </div>
+                        `;
+                        actionHtml = `
+                            <button class="btn-rider btn-deliver" onclick="handleRiderAction(${ord.id}, 'completed', 'ยืนยันการจัดส่งถึงมือลูกค้าเรียบร้อยแล้วใช่หรือไม่?')">
+                                ✅ 2. จัดส่งสำเร็จเรียบร้อย
+                            </button>
+                        `;
+                        startTrackingLocation(ord.id);
+                    } else if (isCompleted) {
+                        statusBadge = '<span class="status-pill pill-completed">🎉 จัดส่งเสร็จสิ้น</span>';
+                        actionHtml = '<span style="color: #059669; font-weight: bold; font-size: 14px;">✔ ส่งถึงมือลูกค้าแล้ว</span>';
+                    }
+
+                    const paymentText = ord.payment_method === 'cash_on_delivery' 
+                        ? '<span style="color:#d97706; font-weight:bold;">💵 เก็บเงินปลายทาง (COD)</span>' 
+                        : '<span style="color:#2563eb; font-weight:bold;">📱 โอนเงิน / พร้อมเพย์</span>';
+
+                    const formattedDate = ord.created_at 
+                        ? new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+                        : '-';
+
+                    const items = ord.items || [];
+                    let itemsHtml = '';
+                    if (items.length > 0) {
+                        const itemRows = items.map(it => {
+                            const fName = it.food_name || it.name || 'อาหาร';
+                            const qty = Number(it.quantity) || 1;
+                            const pr = (Number(it.price || 0) * qty).toLocaleString();
+                            return `<div style="display:flex; justify-content:space-between; padding:3px 0;"><span>• ${fName} × ${qty}</span><span>${pr} บาท</span></div>`;
+                        }).join('');
+                        itemsHtml = `<div class="items-box"><strong>รายการอาหาร:</strong>${itemRows}</div>`;
+                    }
+
+                    return `
+                        <div class="order-card ${ord.status}">
+                            <div class="card-top">
+                                <div>
+                                    <h3 style="margin: 0 0 4px 0; color: #0f172a;">คำสั่งซื้อ #${ord.id} - ${ord.restaurant_name || 'ร้านอาหาร'}</h3>
+                                    <div style="font-size: 13px; color: #64748b;">🕒 เวลาที่สั่งซื้อ: ${formattedDate} น.</div>
+                                </div>
+                                ${statusBadge}
+                            </div>
+
+                            <div class="info-grid">
+                                <div><strong>👤 ชื่อลูกค้า:</strong> ${ord.customer_name || '-'} | <strong>โทร:</strong> ${ord.customer_phone || '-'}</div>
+                                <div><strong>💳 รูปแบบชำระ:</strong> ${paymentText}</div>
+                                <div><strong>💰 ยอดชำระสุทธิ:</strong> <span style="color: #e11d48; font-weight: bold; font-size: 15px;">${Number(ord.total_amount || 0).toLocaleString()} บาท</span></div>
+                                <div><strong>🏪 ร้านค้า:</strong> ${ord.restaurant_name || 'รหัส #' + (ord.restaurant_id || '-')}</div>
+                                <div style="grid-column: span 2;">
+                                    <strong>📍 จุดส่งมอบอาหาร:</strong> ${ord.delivery_address || '-'}
+                                </div>
+                            </div>
+
+                            ${itemsHtml}
+                            ${gpsAlertHtml}
+
+                            <div class="action-btns">
+                                ${actionHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Load Rider Error:", err);
+                container.innerHTML = '<p style="color: #dc2626; text-align: center; padding: 20px;">❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้</p>';
+            }
+        }
+
+        // 5. ส่งพิกัด GPS
+        function startTrackingLocation(orderId) {
+            if (activeGpsWatchId !== null) return;
+
+            if ("geolocation" in navigator) {
+                activeGpsWatchId = navigator.geolocation.watchPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        try {
+                            await fetch(`/api/orders/${orderId}/location`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    lat: latitude, 
+                                    lng: longitude, 
+                                    rider_name: currentUser.name || 'สมชาย สายซิ่ง',
+                                    rider_phone: currentUser.phone || '089-111-2233',
+                                    vehicle_plate: currentUser.vehicle_plate || '1กข-8888 กทม.'
+                                })
+                            });
+                        } catch (e) {
+                            console.error("GPS upload failed:", e);
+                        }
+                    },
+                    (err) => {
+                        console.warn("ไม่สามารถอ่าน GPS ได้ (จำลองพิกัดอัตโนมัติ)", err);
+                        fetch(`/api/orders/${orderId}/location`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                lat: 13.7437, 
+                                lng: 100.4889, 
+                                rider_name: currentUser.name || 'สมชาย สายซิ่ง'
+                            })
+                        }).catch(() => {});
+                    },
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                );
+            }
+        }
+
+        function stopTrackingLocation() {
+            if (activeGpsWatchId !== null) {
+                navigator.geolocation.clearWatch(activeGpsWatchId);
+                activeGpsWatchId = null;
+            }
+        }
+
+        // 6. อัปเดตสถานะงาน
+        async function handleRiderAction(orderId, nextStatus, confirmMsg) {
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const res = await fetch(`/api/orders/${orderId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        status: nextStatus, 
+                        rider_id: currentUser.id 
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    if (nextStatus === 'completed') {
+                        stopTrackingLocation();
+                    }
+                    await loadRiderOrders();
+                    await loadRiderWallet();
+                } else {
+                    alert(result.message || 'ไม่สามารถอัปเดตสถานะได้');
+                }
+            } catch (err) {
+                console.error("Update Status Error:", err);
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+        }
+
+        function logout() {
+            stopTrackingLocation();
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        // เริ่มต้นการทำงาน
+        loadRiderOrders();
+        loadRiderWallet();
+        setInterval(() => {
+            loadRiderOrders();
+            loadRiderWallet();
+        }, 3000);
+    </script>
+</body>
+</html>

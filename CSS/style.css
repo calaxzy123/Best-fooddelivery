@@ -1,0 +1,1785 @@
+/* =========================
+   Reset
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+/* =========================
+   Body
+========================= */
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+
+/* =========================
+   Header
+========================= */
+
+header {
+    background-color: #66BB6A;
+    color: white;
+    padding: 20px;
+}
+
+
+/* Logo */
+
+header h1 {
+    margin-bottom: 10px;
+}
+
+
+/* Navigation */
+
+nav {
+    display: flex;
+    gap: 20px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================
+   Main
+========================= */
+
+main {
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+main h2 {
+    margin-bottom: 20px;
+}
+
+
+/* =========================
+   Section
+========================= */
+
+section {
+    margin-bottom: 30px;
+}
+
+
+/* =========================
+   Restaurant / Food Card
+========================= */
+
+article {
+    background-color: white;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+}
+
+
+/* =========================
+   Button
+========================= */
+
+button {
+    background-color: #66BB6A;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+
+/* =========================
+   Input
+========================= */
+
+input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+
+/* =========================
+   Footer
+========================= */
+
+footer {
+    text-align: center;
+    background-color: #222;
+    color: white;
+    padding: 20px;
+    margin-top: 50px;
+}
+
+
+
+
+
+/* =========================
+   Restaurant Grid
+========================= */
+
+.restaurant-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 20px;
+}
+
+
+/* =========================
+   Restaurant Card
+========================= */
+
+.restaurant-card {
+    background-color: white;
+
+    padding: 20px;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.08);
+
+    transition:
+        transform 0.2s;
+}
+
+
+/* Card Hover */
+
+.restaurant-card:hover {
+    transform: translateY(-5px);
+}
+
+
+/* =========================
+   Restaurant Image
+========================= */
+
+.restaurant-image {
+    height: 160px;
+
+    background-color: #eeeeee;
+
+    border-radius: 10px;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    font-size: 70px;
+
+    margin-bottom: 15px;
+}
+
+
+/* =========================
+   Restaurant Button
+========================= */
+
+.btn {
+    display: inline-block;
+
+    background-color: #81C784;
+
+    color: white;
+
+    text-decoration: none;
+
+    padding: 10px 20px;
+
+    border-radius: 6px;
+
+    margin-top: 10px;
+}
+
+
+.btn:hover {
+    background-color: #43A047;
+}
+
+
+
+
+/* =========================
+   Responsive
+========================= */
+
+@media (max-width: 768px) {
+
+    .restaurant-grid {
+        grid-template-columns: 1fr;
+    }
+
+    nav {
+        flex-direction: column;
+
+        gap: 10px;
+    }
+
+}
+
+
+
+/* =========================
+   FOOD MENU
+========================= */
+
+.food-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+}
+
+
+.food-card {
+    background-color: white;
+    border-radius: 12px;
+    overflow: hidden;
+
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+
+.food-card:hover {
+    transform: translateY(-5px);
+
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+
+/* รูปอาหาร */
+
+.food-card img {
+    width: 100%;
+    height: 220px;
+
+    object-fit: cover;
+
+    display: block;
+}
+
+
+/* ข้อมูลอาหาร */
+
+.food-info {
+    padding: 20px;
+}
+
+
+.food-info h3 {
+    margin-bottom: 8px;
+    font-size: 20px;
+}
+
+
+.food-info p {
+    color: #666;
+
+    margin-bottom: 12px;
+}
+
+
+.food-info strong {
+    display: block;
+
+    font-size: 20px;
+
+    color: #388E3C;
+
+    margin-bottom: 15px;
+}
+
+
+/* ปุ่มเพิ่มตะกร้า */
+
+.food-info button {
+    width: 100%;
+
+    background-color: #81C784;
+
+    color: white;
+
+    border: none;
+
+    padding: 12px;
+
+    border-radius: 6px;
+
+    cursor: pointer;
+
+    font-size: 16px;
+
+    font-weight: bold;
+}
+
+
+.food-info button:hover {
+    background-color: #43A047;
+}
+
+
+/* Responsive */
+
+@media (max-width: 900px) {
+
+    .food-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    .food-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .food-card img {
+        height: 200px;
+    }
+
+}
+
+
+
+.restaurant-image {
+    width: 320px;
+    height: 120px;
+    overflow: hidden;
+    border-radius: 10px;
+    margin: 0 auto 15px;
+}
+
+.restaurant-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* =========================================
+   HOME PAGE
+========================================= */
+
+
+/* HEADER */
+
+.main-header {
+    background-color: #66BB6A;
+    padding: 15px 20px;
+}
+
+.header-container {
+    max-width: 1100px;
+    margin: auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    margin: 0;
+    font-size: 28px;
+}
+
+
+/* HERO */
+
+.hero {
+    background: linear-gradient(
+        135deg,
+        #66BB6A,
+        #81C784
+    );
+
+    color: white;
+
+    padding: 70px 20px;
+}
+
+.hero-content {
+    max-width: 1100px;
+    margin: auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 40px;
+}
+
+.hero-text {
+    flex: 1;
+}
+
+.hero-small {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.hero h2 {
+    font-size: 52px;
+    line-height: 1.15;
+    margin-bottom: 20px;
+}
+
+.hero p {
+    font-size: 18px;
+    margin-bottom: 25px;
+}
+
+.search-box {
+    display: flex;
+    max-width: 600px;
+    background-color: white;
+
+    padding: 6px;
+
+    border-radius: 10px;
+
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    flex: 1;
+
+    border: none;
+    outline: none;
+
+    max-width: none;
+
+    padding: 15px;
+
+    font-size: 16px;
+}
+
+.search-box button {
+    padding: 12px 25px;
+
+    background-color: #ff5722;
+}
+
+.search-box button:hover {
+    background-color: #e64a19;
+}
+
+.hero-button {
+    display: inline-block;
+
+    background-color: white;
+    color: #ff5722;
+
+    text-decoration: none;
+
+    padding: 13px 25px;
+
+    border-radius: 8px;
+
+    font-weight: bold;
+}
+
+.hero-button:hover {
+    background-color: #fff3e0;
+}
+
+.hero-image {
+    width: 350px;
+    height: 300px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.hero-food {
+    font-size: 200px;
+
+    filter: drop-shadow(
+        0 15px 10px rgba(0,0,0,0.2)
+    );
+}
+
+
+/* SECTION */
+
+.section-description {
+    color: #777;
+    margin-bottom: 25px;
+}
+
+
+/* CATEGORY */
+
+.categories {
+    margin-bottom: 60px;
+}
+
+.category-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(5, 1fr);
+
+    gap: 18px;
+}
+
+.category-card {
+    background-color: white;
+
+    padding: 25px 15px;
+
+    border-radius: 12px;
+
+    text-align: center;
+
+    text-decoration: none;
+
+    color: #333;
+
+    box-shadow:
+        0 4px 12px rgba(0,0,0,0.08);
+
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+}
+
+.category-card:hover {
+    transform: translateY(-6px);
+
+    box-shadow:
+        0 8px 20px rgba(0,0,0,0.12);
+}
+
+.category-icon {
+    font-size: 55px;
+
+    margin-bottom: 10px;
+}
+
+.category-card h3 {
+    margin-bottom: 5px;
+}
+
+.category-card p {
+    color: #777;
+
+    font-size: 14px;
+}
+
+
+/* HOME SECTION */
+
+.home-section {
+    margin-bottom: 60px;
+}
+
+.section-header {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 25px;
+}
+
+.section-header h2 {
+    margin-bottom: 5px;
+}
+
+.section-header p {
+    color: #777;
+}
+
+.view-all {
+    color: #ff5722;
+
+    text-decoration: none;
+
+    font-weight: bold;
+}
+
+
+/* RESTAURANT */
+
+.restaurant-content {
+    padding: 5px;
+}
+
+.restaurant-content h3 {
+    margin-bottom: 8px;
+}
+
+.restaurant-content p {
+    color: #666;
+
+    margin-bottom: 5px;
+}
+
+.restaurant-placeholder {
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    font-size: 80px;
+}
+
+
+/* POPULAR FOOD */
+
+.popular-food-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 20px;
+}
+
+.popular-food-card {
+    background-color: white;
+
+    padding: 20px;
+
+    border-radius: 12px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    box-shadow:
+        0 4px 12px rgba(0,0,0,0.08);
+}
+
+.popular-food-icon {
+    width: 80px;
+    height: 80px;
+
+    flex-shrink: 0;
+
+    background-color: #fff3e0;
+
+    border-radius: 10px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    font-size: 45px;
+}
+
+.popular-food-card h3 {
+    margin-bottom: 3px;
+}
+
+.popular-food-card p {
+    color: #777;
+
+    font-size: 14px;
+
+    margin-bottom: 5px;
+}
+
+.popular-food-card strong {
+    color: #e65100;
+
+    font-size: 18px;
+}
+
+.popular-food-card button {
+    margin-left: auto;
+
+    padding: 8px 14px;
+
+    white-space: nowrap;
+}
+
+
+/* FEATURES */
+
+.features {
+    background-color: white;
+
+    padding: 40px;
+
+    border-radius: 15px;
+
+    margin-bottom: 60px;
+}
+
+.features > h2 {
+    text-align: center;
+
+    margin-bottom: 30px;
+}
+
+.feature-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 25px;
+}
+
+.feature-card {
+    text-align: center;
+
+    padding: 20px;
+}
+
+.feature-card > div {
+    font-size: 45px;
+
+    margin-bottom: 10px;
+}
+
+.feature-card h3 {
+    margin-bottom: 8px;
+}
+
+.feature-card p {
+    color: #777;
+}
+
+
+/* FOOTER */
+
+footer h3 {
+    margin-bottom: 8px;
+}
+
+footer p {
+    margin-bottom: 5px;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 900px) {
+
+    .category-grid {
+        grid-template-columns:
+            repeat(3, 1fr);
+    }
+
+    .feature-grid {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+    .hero h2 {
+        font-size: 42px;
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .header-container {
+        flex-direction: column;
+
+        gap: 15px;
+    }
+
+    .hero-content {
+        flex-direction: column;
+
+        text-align: center;
+    }
+
+    .hero h2 {
+        font-size: 38px;
+    }
+
+    .search-box {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .hero-image {
+        display: none;
+    }
+
+    .category-grid {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+    .popular-food-grid {
+        grid-template-columns: 1fr;
+    }
+
+   .restaurant-grid {
+    grid-template-columns: repeat(3, 1fr);
+}
+}
+
+
+@media (max-width: 500px) {
+
+    .category-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .feature-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .features {
+        padding: 20px;
+    }
+
+    .search-box {
+        flex-direction: column;
+        background: transparent;
+        gap: 10px;
+    }
+
+    .search-box input {
+        border-radius: 8px;
+    }
+
+    .search-box button {
+        border-radius: 8px;
+    }
+
+}
+
+
+/* =========================================
+   แก้การ์ดร้านอาหารหน้าหลัก
+   ========================================= */
+
+.home-section .restaurant-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+}
+
+.home-section .restaurant-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 15px !important;
+}
+
+/* รูปร้าน */
+.home-section .restaurant-image {
+    width: 100% !important;
+    height: 120px !important;
+    overflow: hidden !important;
+    border-radius: 10px !important;
+    margin-bottom: 15px !important;
+}
+
+.home-section .restaurant-image img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+/* =========================================
+   FIX ร้านอาหารยอดนิยม
+   ========================================= */
+
+/* บังคับร้านอาหารเป็น 3 คอลัมน์ */
+.home-section .restaurant-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+}
+
+/* ให้ Card ทั้ง 3 ใบมีขนาดเท่ากัน */
+.home-section .restaurant-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 15px !important;
+}
+
+/* กล่องรูปให้เท่ากัน */
+.home-section .restaurant-image {
+    width: 100% !important;
+    height: 140px !important;
+    overflow: hidden !important;
+    border-radius: 10px !important;
+    margin: 0 0 15px 0 !important;
+}
+
+/* รูปทุกแบบใน Card */
+.home-section .restaurant-image img,
+.home-section .restaurant-card img {
+    width: 100% !important;
+    height: 140px !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+/* ถ้ายังใช้ emoji placeholder */
+.home-section .restaurant-placeholder {
+    width: 100% !important;
+    height: 140px !important;
+    font-size: 60px !important;
+}
+
+/* มือถือ */
+@media (max-width: 700px) {
+    .home-section .restaurant-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* =========================================
+   POPULAR FOOD IMAGE
+   ========================================= */
+
+.popular-food-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.popular-food-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.popular-food-image {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+}
+
+.popular-food-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.popular-food-info {
+    padding: 15px;
+}
+
+.popular-food-info h3 {
+    margin-bottom: 5px;
+}
+
+.popular-food-info p {
+    color: #777;
+    margin-bottom: 8px;
+}
+
+.popular-food-info strong {
+    display: block;
+    color: #388E3C;
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.popular-food-info button {
+    width: 100%;
+    background-color: #81C784;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.popular-food-info button:hover {
+    background-color: #43A047;
+}
+
+
+/* มือถือ */
+@media (max-width: 700px) {
+
+    .popular-food-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+/* =========================================
+   CART PAGE
+   ========================================= */
+
+.cart-section {
+    max-width: 1000px;
+    margin: 40px auto;
+}
+
+.cart-section h2 {
+    margin-bottom: 25px;
+}
+
+
+/* สินค้าแต่ละรายการ */
+
+.cart-item {
+    background-color: white;
+    border-radius: 12px;
+    padding: 20px;
+
+    margin-bottom: 15px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+
+/* ข้อมูลสินค้า */
+
+.cart-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.cart-info img {
+    width: 100px;
+    height: 80px;
+
+    object-fit: cover;
+
+    border-radius: 10px;
+}
+
+.cart-info h3 {
+    margin-bottom: 5px;
+}
+
+.cart-info p {
+    color: #777;
+    margin-bottom: 3px;
+}
+
+
+/* จำนวน */
+
+.quantity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quantity button {
+    width: 35px;
+    height: 35px;
+
+    border: none;
+    border-radius: 6px;
+
+    background-color: #81C784;
+    color: white;
+
+    cursor: pointer;
+
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.quantity button:hover {
+    background-color: #43A047;
+}
+
+.quantity span {
+    min-width: 25px;
+    text-align: center;
+    font-weight: bold;
+}
+
+
+/* ปุ่มลบ */
+
+.remove-btn {
+    background-color: #e57373;
+    color: white;
+
+    border: none;
+    border-radius: 6px;
+
+    padding: 8px 12px;
+
+    cursor: pointer;
+}
+
+.remove-btn:hover {
+    background-color: #d32f2f;
+}
+
+
+/* สรุปยอด */
+
+.cart-summary {
+    background-color: white;
+
+    padding: 25px;
+
+    border-radius: 12px;
+
+    margin-top: 25px;
+
+    text-align: right;
+
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.cart-summary h3 {
+    margin-bottom: 15px;
+}
+
+.cart-summary p {
+    font-size: 20px;
+    margin-bottom: 15px;
+}
+
+.cart-summary strong {
+    color: #388E3C;
+}
+
+
+/* ปุ่ม Checkout */
+
+.checkout-btn {
+    background-color: #66BB6A;
+
+    color: white;
+
+    border: none;
+
+    padding: 12px 25px;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 16px;
+
+    font-weight: bold;
+}
+
+.checkout-btn:hover {
+    background-color: #43A047;
+}
+
+
+/* มือถือ */
+
+@media (max-width: 700px) {
+
+    .cart-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cart-info {
+        width: 100%;
+    }
+
+    .quantity {
+        justify-content: center;
+    }
+
+    .remove-btn {
+        width: 100%;
+    }
+
+    .cart-summary {
+        text-align: center;
+    }
+
+}
+
+.cart-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.cart-info img {
+    width: 120px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block;
+}
+
+
+.cart-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.clear-cart-btn,
+.checkout-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.clear-cart-btn {
+    background: #e53935;
+    color: white;
+}
+
+.clear-cart-btn:hover {
+    background: #c62828;
+}
+
+.checkout-btn {
+    background: #66BB6A;
+    color: white;
+}
+
+.checkout-btn:hover {
+    background: #43A047;
+}
+
+@media (max-width: 600px) {
+
+    .cart-buttons {
+        flex-direction: column;
+    }
+
+    .clear-cart-btn,
+    .checkout-btn {
+        width: 100%;
+    }
+}
+
+
+/* =========================
+   CHECKOUT
+========================= */
+
+.checkout-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.checkout-container h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.checkout-box {
+    background: white;
+    padding: 25px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+}
+
+.checkout-box h2 {
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+
+/* Payment */
+
+.payment-option {
+    display: block;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.payment-option:hover {
+    background: #f1f8f2;
+}
+
+
+/* Checkout item */
+
+.checkout-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 15px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.checkout-item img {
+    width: 100px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.checkout-item h3 {
+    margin: 0 0 8px;
+}
+
+.checkout-item p {
+    margin: 5px 0;
+}
+
+
+/* Summary */
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+}
+
+.summary-row.total {
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+
+/* Confirm */
+
+.confirm-order-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    background: #66BB6A;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.confirm-order-btn:hover {
+    background: #43A047;
+}
+
+
+/* Mobile */
+
+@media (max-width: 600px) {
+
+    .checkout-container {
+        margin: 20px auto;
+        padding: 10px;
+    }
+
+    .checkout-box {
+        padding: 18px;
+    }
+
+    .checkout-item img {
+        width: 80px;
+        height: 70px;
+    }
+
+}
+
+/* =========================
+   ORDER PAGE
+========================= */
+
+.order-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.order-container h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+
+/* Order Box */
+
+.order-box {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+
+/* Order Header */
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.order-header h2 {
+    margin-bottom: 10px;
+}
+
+.order-status {
+    background: #66BB6A;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+
+/* Customer */
+
+.customer-info {
+    background: #f7faf7;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 15px 0;
+}
+
+.customer-info p {
+    margin: 8px 0;
+}
+
+
+/* Order Items */
+
+.order-items {
+    margin-top: 15px;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+
+    padding: 15px 0;
+
+    border-bottom: 1px solid #eee;
+}
+
+.order-item img {
+    width: 100px;
+    height: 80px;
+
+    object-fit: cover;
+
+    border-radius: 10px;
+}
+
+.order-item-info {
+    flex: 1;
+}
+
+.order-item-info h3 {
+    margin: 0 0 8px;
+}
+
+.order-item-info p {
+    margin: 0;
+}
+
+
+/* Summary */
+
+.order-summary {
+    margin-top: 20px;
+}
+
+.order-summary > div {
+    display: flex;
+    justify-content: space-between;
+
+    padding: 10px 0;
+}
+
+.order-total {
+    font-size: 22px;
+    font-weight: bold;
+
+    border-top: 2px solid #eee;
+
+    margin-top: 10px;
+    padding-top: 15px !important;
+}
+
+
+/* Tracking */
+
+.tracking {
+    margin-top: 25px;
+}
+
+.tracking-step {
+    display: flex;
+    align-items: center;
+
+    gap: 15px;
+
+    padding: 15px;
+
+    border-radius: 10px;
+
+    background: #f5f5f5;
+}
+
+.tracking-step.active {
+    background: #e8f5e9;
+}
+
+.tracking-icon {
+    width: 45px;
+    height: 45px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #ddd;
+
+    border-radius: 50%;
+
+    font-size: 20px;
+}
+
+.tracking-step.active .tracking-icon {
+    background: #66BB6A;
+    color: white;
+}
+
+.tracking-step p {
+    margin: 5px 0 0;
+    color: #666;
+}
+
+.tracking-line {
+    width: 3px;
+    height: 25px;
+
+    background: #ddd;
+
+    margin-left: 36px;
+}
+
+
+/* Buttons */
+
+.order-actions {
+    text-align: center;
+
+    margin-top: 30px;
+}
+
+.order-food-btn {
+    display: inline-block;
+
+    background: #66BB6A;
+
+    color: white;
+
+    text-decoration: none;
+
+    padding: 12px 25px;
+
+    border-radius: 8px;
+
+    font-weight: bold;
+}
+
+.order-food-btn:hover {
+    background: #43A047;
+}
+
+
+/* No Order */
+
+.no-order {
+    background: white;
+
+    padding: 50px;
+
+    text-align: center;
+
+    border-radius: 15px;
+
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.no-order h2 {
+    margin-bottom: 10px;
+}
+
+.no-order p {
+    color: #666;
+
+    margin-bottom: 25px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 600px) {
+
+    .order-container {
+        margin: 20px auto;
+        padding: 10px;
+    }
+
+    .order-box {
+        padding: 20px;
+    }
+
+    .order-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .order-item {
+        gap: 10px;
+    }
+
+    .order-item img {
+        width: 80px;
+        height: 70px;
+    }
+
+    .order-total {
+        font-size: 18px;
+    }
+
+}
+
+
+.order-status-btn {
+    padding: 12px 25px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: #66BB6A;
+
+    color: white;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    margin-right: 10px;
+}
+
+.order-status-btn:hover {
+    background: #43A047;
+}
+
+.order-actions {
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-top: 30px;
+}
+
+@media (max-width: 600px) {
+
+    .order-actions {
+        flex-direction: column;
+    }
+
+    .order-status-btn,
+    .order-food-btn {
+        width: 100%;
+
+        text-align: center;
+
+        box-sizing: border-box;
+
+        margin-right: 0;
+    }
+}
+

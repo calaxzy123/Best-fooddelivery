@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตะกร้าสินค้า - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        .cart-section {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        }
+
+        .cart-item-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            padding: 1rem 0;
+        }
+
+        .cart-item-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .cart-item-img {
+            width: 70px;
+            height: 70px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .cart-summary {
+            margin-top: 1.5rem;
+            border-top: 2px dashed #eee;
+            padding-top: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cart-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .clear-cart-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .checkout-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .empty-cart-msg {
+            text-align: center;
+            color: #888;
+            padding: 3rem 0;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="main-header">
+        <div class="header-container">
+            <h1 class="logo">🍴 BestFood Delivery</h1>
+            <nav>
+                <a href="index.html">หน้าแรก</a>
+                <a href="restaurants.html">ร้านอาหาร</a>
+                <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+                <a href="order.html">📦 คำสั่งซื้อ</a>
+                <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="cart-section">
+            <h2>🛒 ตะกร้าสินค้า</h2>
+
+            <div id="cart-items">
+                <!-- รายการสินค้าจาก Database -->
+            </div>
+
+            <div class="cart-summary">
+                <div>
+                    <h2>ยอดรวมค่าอาหาร</h2>
+                    <small style="color: #6b7280;">(ยังไม่รวมค่าจัดส่ง 20 บาท)</small>
+                </div>
+                <strong id="total-price" style="font-size: 1.5rem; color: #e53935;">
+                    0 บาท
+                </strong>
+            </div>
+
+            <div class="cart-buttons" style="justify-content: flex-end;">
+                <button class="clear-cart-btn" onclick="clearCart()">🗑️ ล้างตะกร้า</button>
+                <button class="checkout-btn" onclick="checkout()">ดำเนินการสั่งซื้อ ➔</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <h3>🍴 BestFood Delivery</h3>
+        <p>สั่งอาหารง่าย ๆ ส่งตรงถึงบ้าน</p>
+        <p>© 2026 Food Delivery</p>
+    </footer>
+
+    <script src="script.js"></script>
+
+    <script>
+        function getFoodImage(image) {
+            if (!image) return "Image/logoweb.png";
+            image = String(image).trim();
+            if (image.startsWith("http://") || image.startsWith("https://")) return image;
+            if (image.startsWith("Image/") || image.startsWith("image/")) return image;
+            return "Image/" + image;
+        }
+
+        async function renderCartPage() {
+            const container = document.getElementById("cart-items");
+            const totalPriceEl = document.getElementById("total-price");
+            const countEl = document.getElementById("cart-count");
+
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
+            if (!currentUser) {
+                container.innerHTML = `
+                    <div class="empty-cart-msg">
+                        <p>กรุณาเข้าสู่ระบบก่อนดูตะกร้าสินค้า</p>
+                        <a href="login.html" style="display:inline-block; margin-top:10px; color:#10b981; font-weight:bold; text-decoration:none;">
+                            🔐 เข้าสู่ระบบ
+                        </a>
+                    </div>
+                `;
+                totalPriceEl.textContent = "0 บาท";
+                if (countEl) countEl.textContent = "0";
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/cart/${currentUser.id}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.message || "ไม่สามารถโหลดตะกร้าได้");
+                }
+
+                const cart = result.data || [];
+                const totalQty = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                if (countEl) countEl.textContent = totalQty;
+
+                if (cart.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-cart-msg">
+                            <p>ไม่มีสินค้าในตะกร้าของคุณ 🛒</p>
+                            <a href="restaurants.html" style="display:inline-block; margin-top:10px; color:#10b981; font-weight:bold; text-decoration:none;">
+                                🍔 ไปเลือกร้านอาหาร
+                            </a>
+                        </div>
+                    `;
+                    totalPriceEl.textContent = "0 บาท";
+                    return;
+                }
+
+                let subtotal = 0;
+                container.innerHTML = cart.map(item => {
+                    const price = Number(item.price || 0);
+                    const quantity = Number(item.quantity || 1);
+                    const itemTotal = price * quantity;
+                    subtotal += itemTotal;
+                    const image = getFoodImage(item.image);
+
+                    return `
+                        <div class="cart-item-card">
+                            <div class="cart-item-info">
+                                <img src="${image}" class="cart-item-img" alt="${item.name}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                                <div>
+                                    <h3 style="margin:0 0 5px 0;">${item.name}</h3>
+                                    <span style="color:#6b7280;">฿${price.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; align-items:center; gap:1.2rem;">
+                                <div style="display:inline-flex; align-items:center; gap:8px; background:#f3f4f6; padding:4px 8px; border-radius:6px; border:1px solid #ddd;">
+                                    <button type="button" onclick="decreaseCartItem(${item.food_id})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
+                                    <span style="font-weight:bold; min-width:26px; text-align:center; font-size:16px; color:#111;">${quantity}</span>
+                                    <button type="button" onclick="increaseCartItem(${item.food_id})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
+                                </div>
+                                <strong style="min-width:85px; text-align:right; font-size:1.05rem; color:#111;">${itemTotal.toLocaleString()} ฿</strong>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+
+                totalPriceEl.textContent = `${subtotal.toLocaleString()} บาท`;
+
+            } catch (error) {
+                console.error("Cart Error:", error);
+                container.innerHTML = `
+                    <div class="empty-cart-msg">
+                        <p>❌ ไม่สามารถโหลดตะกร้าได้</p>
+                    </div>
+                `;
+                totalPriceEl.textContent = "0 บาท";
+            }
+        }
+
+        async function increaseCartItem(foodId) {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+            if (!currentUser) return;
+
+            try {
+                const response = await fetch("/api/cart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        food_id: foodId,
+                        quantity: 1
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    await renderCartPage();
+                    if (window.cartManager) await window.cartManager.updateCartBadge();
+                }
+            } catch (error) {
+                alert("ไม่สามารถเพิ่มจำนวนสินค้าได้");
+            }
+        }
+
+        async function decreaseCartItem(foodId) {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+            if (!currentUser) return;
+
+            try {
+                const response = await fetch("/api/cart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        food_id: foodId,
+                        quantity: -1
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    await renderCartPage();
+                    if (window.cartManager) await window.cartManager.updateCartBadge();
+                }
+            } catch (error) {
+                alert("ไม่สามารถลดจำนวนสินค้าได้");
+            }
+        }
+
+        async function clearCart() {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+            if (!currentUser) return;
+
+            if (!confirm("คุณต้องการล้างสินค้าทั้งหมดในตะกร้าหรือไม่?")) return;
+
+            try {
+                const response = await fetch(`/api/cart/${currentUser.id}`, {
+                    method: "DELETE"
+                });
+                const result = await response.json();
+                if (result.success) {
+                    await renderCartPage();
+                    if (window.cartManager) await window.cartManager.updateCartBadge();
+                }
+            } catch (error) {
+                alert("ล้างตะกร้าไม่สำเร็จ");
+            }
+        }
+
+        function checkout() {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+            if (!currentUser) {
+                alert("กรุณาเข้าสู่ระบบก่อนดำเนินการสั่งซื้อ");
+                window.location.href = "login.html";
+                return;
+            }
+            window.location.href = "checkout.html";
+        }
+
+        document.addEventListener("DOMContentLoaded", renderCartPage);
+    </script>
+</body>
+
+</html>

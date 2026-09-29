@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BestFood Delivery - สั่งอาหารออนไลน์</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* สไตล์กล่องกระเป๋าเงินลูกค้าบน Header */
+        .customer-wallet-badge {
+            display: none;
+            align-items: center;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13.5px;
+            color: #065f46;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .customer-wallet-badge strong {
+            color: #047857;
+            margin-left: 4px;
+        }
+
+        .btn-topup {
+            margin-left: 8px;
+            background: #10b981;
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-topup:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="main-header">
+        <div class="header-container">
+            <h1 class="logo">🍴 BestFood Delivery</h1>
+            <nav style="display: flex; align-items: center; gap: 12px;">
+                <a href="index.html" style="font-weight: bold; color: #2563eb;">หน้าแรก</a>
+                <a href="restaurants.html">ร้านอาหาร</a>
+                <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+                <a href="order.html">📦 คำสั่งซื้อ</a>
+                
+                <!-- กล่องแสดงกระเป๋าเงินลูกค้า -->
+                <div id="customerWalletBox" class="customer-wallet-badge">
+                    <span>💰 กระเป๋าเงิน:</span>
+                    <strong id="customerWalletBalance">฿0.00</strong>
+                    <button type="button" class="btn-topup" onclick="promptCustomerTopup()">+ เติมเงิน</button>
+                </div>
+
+                <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-text">
+                <p class="hero-small">🍽️ อาหารอร่อย ส่งตรงถึงบ้าน</p>
+                <h2>หิวเมื่อไหร่<br>สั่งได้ทันที!</h2>
+                <p>เลือกร้านอาหารและเมนูโปรด แล้วให้เราส่งความอร่อยถึงหน้าบ้านคุณ</p>
+
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 ค้นหาร้านอาหารหรือเมนู..." onkeypress="if(event.key === 'Enter') searchFood()">
+                    <button type="button" onclick="searchFood()">ค้นหา</button>
+                </div>
+
+                <a href="restaurants.html" class="hero-button">🍴 สั่งอาหารเลย</a>
+            </div>
+
+            <div class="hero-image">
+                <img src="Image/logoweb.png" alt="Logo" class="hero-food">
+            </div>
+        </div>
+    </section>
+
+    <main>
+        <section class="categories">
+            <h2>🍽️ เลือกตามหมวดหมู่</h2>
+            <p class="section-description">เลือกอาหารที่คุณชอบได้เลย</p>
+
+            <div class="category-grid">
+                <a href="menu.html?restaurantId=1" class="category-card">
+                    <div class="category-icon">🍛</div>
+                    <h3>อาหารตามสั่ง</h3>
+                    <p>กะเพรา และอื่น ๆ</p>
+                </a>
+
+                <a href="pizza.html" class="category-card">
+                    <div class="category-icon">🍕</div>
+                    <h3>Pizza</h3>
+                    <p>พิซซ่าร้อน ๆ พร้อมส่ง</p>
+                </a>
+
+                <a href="burger.html" class="category-card">
+                    <div class="category-icon">🍔</div>
+                    <h3>Burger</h3>
+                    <p>เบอร์เกอร์ชิ้นโต ๆ</p>
+                </a>
+
+                <a href="noodles.html" class="category-card">
+                    <div class="category-icon">🍜</div>
+                    <h3>ก๋วยเตี๋ยว</h3>
+                    <p>ก๋วยเตี๋ยวร้อน ๆ</p>
+                </a>
+            </div>
+        </section>
+
+        <section class="home-section">
+            <div class="section-header">
+                <div>
+                    <h2>⭐ ร้านอาหารยอดนิยม</h2>
+                    <p>ร้านเด็ดที่ลูกค้าชื่นชอบ</p>
+                </div>
+                <a href="restaurants.html" class="view-all">ดูทั้งหมด →</a>
+            </div>
+
+            <div class="restaurant-grid">
+                <!-- 1. ร้านกะเพราอร่อย -->
+                <article class="restaurant-card">
+                    <div class="restaurant-image">
+                        <img src="Image/kapao-moosub.jpg" alt="ร้านกะเพราอร่อย" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="restaurant-content">
+                        <h3>ร้านกะเพราอร่อย</h3>
+                        <p>⭐ 4.8 · อาหารตามสั่ง</p>
+                        <p>🚚 ส่งประมาณ 20–30 นาที</p>
+                        <a href="menu.html?restaurantId=1" class="btn">ดูเมนู</a>
+                    </div>
+                </article>
+
+                <!-- 2. Pizza House -->
+                <article class="restaurant-card">
+                    <div class="restaurant-image">
+                        <img src="Image/pizzamargherita.jpg" alt="Pizza House" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="restaurant-content">
+                        <h3>Pizza House</h3>
+                        <p>⭐ 4.7 · Pizza</p>
+                        <p>🚚 ส่งประมาณ 25–35 นาที</p>
+                        <a href="pizza.html" class="btn">ดูเมนู</a>
+                    </div>
+                </article>
+
+                <!-- 3. Burger Station -->
+                <article class="restaurant-card">
+                    <div class="restaurant-image">
+                        <img src="Image/burgercheese.jpg" alt="Burger Station" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="restaurant-content">
+                        <h3>Burger Station</h3>
+                        <p>⭐ 4.6 · Burger</p>
+                        <p>🚚 ส่งประมาณ 20–30 นาที</p>
+                        <a href="burger.html" class="btn">ดูเมนู</a>
+                    </div>
+                </article>
+
+                <!-- 4. ก๋วยเตี๋ยวเรือเจ้าอร่อย -->
+                <article class="restaurant-card">
+                    <div class="restaurant-image">
+                        <img src="Image/noodle-pork.jpg" alt="ก๋วยเตี๋ยวเรือเจ้าอร่อย" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="restaurant-content">
+                        <h3>ก๋วยเตี๋ยวเรือเจ้าอร่อย</h3>
+                        <p>⭐ 4.9 · ก๋วยเตี๋ยว</p>
+                        <p>🚚 ส่งประมาณ 15–25 นาที</p>
+                        <a href="noodles.html" class="btn">ดูเมนู</a>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="home-section">
+            <div class="section-header">
+                <div>
+                    <h2>🔥 เมนูยอดนิยม</h2>
+                    <p>เมนูที่คนสั่งกันเยอะที่สุด</p>
+                </div>
+            </div>
+
+            <div class="popular-food-grid">
+                <!-- กะเพราหมูสับ -->
+                <article class="popular-food-card">
+                    <div class="popular-food-image">
+                        <img src="Image/kapao-moosub.jpg" alt="กะเพราหมูสับ" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="popular-food-info">
+                        <h3>กะเพราหมูสับ</h3>
+                        <p>ร้านกะเพราอร่อย</p>
+                        <strong>฿60</strong>
+                        <button type="button" onclick="handleIndexAddToCart('กะเพราหมูสับ', 60, 'Image/kapao-moosub.jpg', 1, 18)">เพิ่มลงตะกร้า</button>
+                    </div>
+                </article>
+
+                <!-- Pepperoni Pizza -->
+                <article class="popular-food-card">
+                    <div class="popular-food-image">
+                        <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="popular-food-info">
+                        <h3>Pepperoni Pizza</h3>
+                        <p>Pizza House</p>
+                        <strong>฿179</strong>
+                        <button type="button" onclick="handleIndexAddToCart('Pepperoni Pizza', 179, 'Image/pepperoni pizza.jpg', 2, 4)">เพิ่มลงตะกร้า</button>
+                    </div>
+                </article>
+
+                <!-- Cheese Burger -->
+                <article class="popular-food-card">
+                    <div class="popular-food-image">
+                        <img src="Image/burgercheese.jpg" alt="Cheese Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    </div>
+                    <div class="popular-food-info">
+                        <h3>Cheese Burger</h3>
+                        <p>Burger Station</p>
+                        <strong>฿149</strong>
+                        <button type="button" onclick="handleIndexAddToCart('Cheese Burger', 149, 'Image/burgercheese.jpg', 3, 8)">เพิ่มลงตะกร้า</button>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <h3>🍴 BestFood Delivery</h3>
+        <p>สั่งอาหารง่าย ๆ ส่งตรงถึงบ้าน</p>
+        <p>© 2026 Food Delivery</p>
+    </footer>
+
+    <script src="script.js?v=4.0"></script>
+    <script>
+        function searchFood() {
+            const query = document.getElementById("searchInput").value.trim();
+            if (query) {
+                window.location.href = `restaurants.html?search=${encodeURIComponent(query)}`;
+            } else {
+                window.location.href = "restaurants.html";
+            }
+        }
+
+        // จัดการเพิ่มสินค้าจากหน้าแรกเข้าตะกร้าพร้อมเชื่อมต่อ API
+        async function handleIndexAddToCart(foodName, price, image, restaurantId, foodId) {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+            const userId = currentUser.id || localStorage.getItem("userId");
+
+            if (!userId) {
+                alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
+                window.location.href = "login.html";
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/cart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        userId: Number(userId),
+                        user_id: Number(userId),
+                        foodId: Number(foodId),
+                        food_id: Number(foodId),
+                        quantity: 1
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    alert(`✅ เพิ่ม "${foodName}" ลงในตะกร้าเรียบร้อยแล้ว!`);
+                    syncIndexUI();
+                } else {
+                    alert(data.message || "ไม่สามารถเพิ่มลงในตะกร้าได้");
+                }
+            } catch (err) {
+                console.error("Add to cart error:", err);
+                if (typeof addToCart === "function") {
+                    addToCart(foodName, price, image, restaurantId, foodId);
+                } else {
+                    alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+                }
+            }
+        }
+
+        // ฟังก์ชันดึงยอดเงินกระเป๋าเงินลูกค้า
+        async function loadCustomerWallet(userId) {
+            try {
+                const res = await fetch(`/api/wallet/${userId}?_t=${Date.now()}`);
+                const data = await res.json();
+                const box = document.getElementById("customerWalletBox");
+                const balanceEl = document.getElementById("customerWalletBalance");
+
+                if (box && balanceEl && data.success) {
+                    box.style.display = "inline-flex";
+                    balanceEl.textContent = `฿${Number(data.balance || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+                }
+            } catch (err) {
+                console.error("Load Wallet Error:", err);
+            }
+        }
+
+        // ฟังก์ชันกดเติมเงินสำหรับลูกค้า
+        async function promptCustomerTopup() {
+            const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+            const userId = currentUser.id || localStorage.getItem("userId");
+
+            if (!userId) {
+                alert("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+                return;
+            }
+
+            const input = prompt("ระบุจำนวนเงินที่ต้องการเติม (บาท):", "100");
+            if (input === null) return;
+
+            const amount = Number(input);
+            if (isNaN(amount) || amount <= 0) {
+                alert("กรุณากรอกจำนวนเงินที่ถูกต้อง");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/wallet/topup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId: Number(userId), amount: amount })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    alert(`🎉 ${data.message || "เติมเงินสำเร็จ!"}`);
+                    loadCustomerWallet(userId);
+                } else {
+                    alert(data.message || "เติมเงินไม่สำเร็จ");
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+        }
+
+        async function syncIndexUI() {
+            try {
+                const userStr = localStorage.getItem("currentUser");
+                if (!userStr) return;
+                const user = JSON.parse(userStr);
+                if (!user || !user.id) return;
+
+                const authLink = document.getElementById("authNav");
+                const role = (user.role || '').toLowerCase();
+
+                if (authLink) {
+                    if (role === 'restaurant' || role === 'merchant') {
+                        authLink.textContent = `🏪 ${user.name} (ร้านค้า)`;
+                        authLink.href = 'merchant.html';
+                    } else if (role === 'rider') {
+                        authLink.textContent = `🛵 ${user.name} (ไรเดอร์)`;
+                        authLink.href = 'rider.html';
+                    } else {
+                        // ลูกค้าทั่วไป -> โหลดกระเป๋าเงินลูกค้ามาแสดง
+                        loadCustomerWallet(user.id);
+
+                        authLink.textContent = `👤 ${user.name} (ออกจากระบบ)`;
+                        authLink.href = "#";
+                        authLink.onclick = (e) => {
+                            e.preventDefault();
+                            if (confirm("ต้องการออกจากระบบหรือไม่?")) {
+                                localStorage.clear();
+                                window.location.reload();
+                            }
+                        };
+                    }
+                }
+
+                const res = await fetch(`/api/cart/${user.id}?_t=${Date.now()}`, { cache: "no-store" });
+                if (!res.ok) return;
+
+                const json = await res.json();
+                const items = json.data || json.items || (Array.isArray(json) ? json : []);
+                const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+                const badge = document.getElementById("cart-count");
+                if (badge) {
+                    badge.textContent = totalQty;
+                }
+            } catch (err) {
+                console.error("UI Sync Error:", err);
+            }
+        }
+
+        syncIndexUI();
+        document.addEventListener("DOMContentLoaded", syncIndexUI);
+        window.addEventListener("load", syncIndexUI);
+    </script>
+</body>
+</html>

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ร้านค้า - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        .main-header {
+            background: #1e293b;
+            color: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header-container {
+            max-width: 950px;
+            margin: auto;
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .merchant-container {
+            max-width: 950px;
+            margin: 25px auto;
+            padding: 0 15px;
+        }
+        .profile-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-left: 6px solid #22c55e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        /* Wallet Card Component */
+        .wallet-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-left: 6px solid #0ea5e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .btn-withdraw {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-withdraw:hover {
+            background: #0284c7;
+        }
+        .merchant-card {
+            background: #fff;
+            padding: 20px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .select-store {
+            padding: 8px 12px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            outline: none;
+            background: #fff;
+            font-weight: bold;
+        }
+        .order-box {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            border-left: 6px solid #cbd5e1;
+        }
+        .order-box.pending { border-left-color: #ef4444; }
+        .order-box.confirmed { border-left-color: #3b82f6; }
+        .order-box.preparing { border-left-color: #f59e0b; }
+        .order-box.ready { border-left-color: #10b981; }
+        .order-box.delivering { border-left-color: #6366f1; }
+        .order-box.completed { border-left-color: #94a3b8; opacity: 0.85; }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+        .status-tag {
+            font-weight: bold;
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .status-pending { background: #fee2e2; color: #b91c1c; }
+        .status-confirmed { background: #dbeafe; color: #1d4ed8; }
+        .status-preparing { background: #fef3c7; color: #b45309; }
+        .status-ready { background: #d1fae5; color: #047857; }
+        .status-delivering { background: #e0e7ff; color: #4338ca; }
+        .status-completed { background: #f1f5f9; color: #475569; }
+
+        .item-list-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #e2e8f0;
+            font-size: 14px;
+        }
+        .action-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn-action {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-action:hover { opacity: 0.9; }
+
+        .btn-refresh-clean {
+            background: #2563eb;
+            color: #ffffff;
+            border: 1px solid #1d4ed8;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-refresh-clean:hover {
+            background: #1d4ed8;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        .modal-content input, .modal-content textarea {
+            width: 100%;
+            padding: 9px 12px;
+            margin: 6px 0 14px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-container">
+            <h1 style="margin: 0; font-size: 20px;">🍳 BestFood Merchant Center</h1>
+            <div style="display:flex; align-items:center; gap: 15px;">
+                <span style="font-size: 14px;">ผู้ดูแล: <b id="displayUserName">-</b></span>
+                <a href="index.html" style="color:white; text-decoration:none; font-size:14px;">หน้าหลักลูกค้า</a>
+                <button onclick="logout()" style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">ออกจากระบบ</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="merchant-container">
+        <!-- แถบโปรไฟล์ร้านค้า -->
+        <section class="profile-card">
+            <div>
+                <h3 style="margin: 0 0 6px 0; font-size: 19px; color: #0f172a;" id="storeProfileName">🏪 กำลังโหลดข้อมูลร้าน...</h3>
+                <div style="font-size: 14px; color: #475569; display: flex; gap: 15px; flex-wrap: wrap;">
+                    <span>📞 โทร: <b id="storeProfilePhone">-</b></span>
+                    <span>📍 ที่อยู่: <b id="storeProfileAddress">-</b></span>
+                </div>
+            </div>
+            <span style="background: #ecfdf5; color: #059669; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; border: 1px solid #a7f3d0;">
+                🟢 ร้านเปิดรับออเดอร์
+            </span>
+        </section>
+
+        <!-- แถบยอดเงินสะสมในระบบ (Wallet Balance) -->
+        <section class="wallet-card">
+            <div>
+                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ยอดเงินสะสมในกระเป๋า (หัก GP 15% อัตโนมัติเมื่อจัดส่งสำเร็จ)</span>
+                <h2 style="margin: 6px 0 0 0; color: #0f172a; font-size: 2.1rem; letter-spacing: -0.5px;">฿<span id="walletBalance">0.00</span></h2>
+            </div>
+            <div>
+                <button type="button" class="btn-withdraw" onclick="requestWithdrawal()">
+                    💸 ถอนเงินเข้าบัญชี
+                </button>
+            </div>
+        </section>
+
+        <div class="merchant-card">
+            <h2 style="margin: 0; display:flex; align-items:center; gap:8px;">
+                🔍 รายการคำสั่งซื้อของร้าน (Merchant Dashboard)
+            </h2>
+
+            <div class="control-row">
+                <div>
+                    <label style="font-weight:bold; font-size:14px;">ร้านค้าของคุณ: </label>
+                    <select id="restaurantSelect" class="select-store" onchange="onSelectStore()">
+                        <option value="2">Pizza House (ID: 2)</option>
+                        <option value="1">ร้านกะเพราอร่อย (ID: 1)</option>
+                        <option value="3">Burger Station (ID: 3)</option>
+                        <option value="4">ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn-refresh-clean" onclick="loadOrders(); loadWalletBalance();">🔄 รีเฟรช</button>
+                    <button type="button" onclick="openModal()" style="background:#10b981; color:white; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-weight:bold;">+ สมัครเปิดร้านใหม่</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="ordersContainer">กำลังโหลดรายการออเดอร์...</div>
+    </main>
+
+    <div class="modal" id="regModal">
+        <div class="modal-content">
+            <h3 style="margin: 0 0 10px 0;">🤝 สมัครเปิดร้านอาหารใหม่</h3>
+            <p style="margin: 0 0 15px 0; font-size:13px; color:#64748b;">เพิ่มร้านค้าของคุณเข้าระบบได้ทันที</p>
+            <form onsubmit="submitStore(event)">
+                <label style="font-size:13px; font-weight:bold;">ชื่อร้านค้า *</label>
+                <input type="text" id="storeName" placeholder="เช่น ร้านส้มตำครกทอง" required>
+
+                <label style="font-size:13px; font-weight:bold;">เบอร์โทรศัพท์ติดต่อ *</label>
+                <input type="tel" id="storePhone" placeholder="เช่น 081-999-8888" required>
+
+                <label style="font-size:13px; font-weight:bold;">ที่ตั้งร้าน / จุดรับอาหาร *</label>
+                <textarea id="storeAddress" rows="3" placeholder="ระบุที่ตั้งร้านค้า" required></textarea>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                    <button type="button" onclick="closeModal()" style="padding:8px 14px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; cursor:pointer;">ยกเลิก</button>
+                    <button type="submit" style="padding:8px 16px; background:#10b981; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">ยืนยันสมัคร</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const userRole = (currentUser.role || '').toLowerCase();
+
+        if (!currentUser.id || (userRole !== 'restaurant' && userRole !== 'merchant' && userRole !== 'admin')) {
+            alert('กรุณาเข้าสู่ระบบด้วยบัญชีร้านค้า');
+            window.location.href = 'login.html';
+        }
+
+        const nameEl = document.getElementById('displayUserName');
+        if (nameEl && currentUser.name) {
+            nameEl.innerText = currentUser.name + ' (' + userRole + ')';
+        }
+
+        function detectStoreId() {
+            if (currentUser.restaurant_id) return Number(currentUser.restaurant_id);
+            const text = ((currentUser.name || '') + ' ' + (currentUser.email || '')).toLowerCase();
+            if (text.includes('pizza') || text.includes('พิซซ่า')) return 2;
+            if (text.includes('burger') || text.includes('เบอร์เกอร์')) return 3;
+            if (text.includes('noodle') || text.includes('ก๋วยเตี๋ยว')) return 4;
+            return 1;
+        }
+
+        let currentStoreId = detectStoreId();
+
+        async function initMerchant() {
+            try {
+                const uRes = await fetch('/api/users/' + currentUser.id);
+                if (uRes.ok) {
+                    const uData = await uRes.json();
+                    if (uData.user && uData.user.restaurant_id) {
+                        currentStoreId = Number(uData.user.restaurant_id);
+                        currentUser.restaurant_id = currentStoreId;
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    }
+                }
+            } catch(e) {}
+
+            await loadStoreDropdown();
+            await loadWalletBalance();
+        }
+
+        async function loadStoreDropdown() {
+            const select = document.getElementById('restaurantSelect');
+            try {
+                const res = await fetch('/api/restaurants?_t=' + Date.now(), { cache: 'no-store' });
+                let allStores = [];
+                if (res.ok) {
+                    const json = await res.json();
+                    allStores = json.restaurants || json.data || (Array.isArray(json) ? json : []);
+                }
+
+                if (allStores.length === 0) {
+                    allStores = [
+                        { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1" },
+                        { id: 2, name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
+                        { id: 3, name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
+                        { id: 4, name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
+                    ];
+                }
+
+                const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || allStores[0];
+                currentStoreId = myStore.id;
+
+                if (userRole === 'admin') {
+                    select.disabled = false;
+                    select.innerHTML = allStores.map(function(s) {
+                        const isSelected = Number(s.id) === Number(currentStoreId) ? 'selected' : '';
+                        return '<option value="' + s.id + '" ' + isSelected + '>' + s.name + ' (ID: ' + s.id + ')</option>';
+                    }).join('');
+                } else {
+                    select.innerHTML = '<option value="' + myStore.id + '" selected>🔒 ' + myStore.name + ' (ร้านของคุณ)</option>';
+                    select.disabled = true;
+                }
+
+                updateProfileCard(myStore);
+            } catch (err) {
+                console.error("Store dropdown error:", err);
+            }
+            loadOrders();
+        }
+
+        function updateProfileCard(store) {
+            document.getElementById('storeProfileName').innerText = '🏪 ' + (store.name || 'ร้านอาหาร');
+            document.getElementById('storeProfilePhone').innerText = store.phone || '082-222-2222';
+            document.getElementById('storeProfileAddress').innerText = store.address || 'กรุงเทพมหานคร';
+        }
+
+        function onSelectStore() {
+            const select = document.getElementById('restaurantSelect');
+            currentStoreId = parseInt(select.value) || 1;
+            loadOrders();
+        }
+
+        async function loadOrders() {
+            const container = document.getElementById('ordersContainer');
+            try {
+                const res = await fetch('/api/restaurant/orders?restaurant_id=' + currentStoreId + '&_t=' + Date.now(), { cache: 'no-store' });
+                const result = await res.json();
+                const orders = result.orders || result.data || [];
+
+                if (orders.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 40px; background: white; border-radius: 12px; color: #64748b;"><h3>ยังไม่มีออเดอร์สำหรับร้านนี้</h3><p>ออเดอร์ใหม่จากลูกค้าจะปรากฏขึ้นที่นี่โดยอัตโนมัติ</p></div>';
+                    return;
+                }
+
+                container.innerHTML = orders.map(function(ord) {
+                    const items = ord.items || [];
+                    const timeStr = ord.created_at ? new Date(ord.created_at).toLocaleTimeString('th-TH') : '-';
+                    const paymentText = ord.payment_method === 'cash_on_delivery' 
+                        ? '💵 เก็บเงินปลายทาง (COD)' 
+                        : '📱 โอนเงิน / พร้อมเพย์';
+
+                    const itemsHtml = items.map(function(it) {
+                        const fName = it.food_name || it.name || 'อาหาร';
+                        const qty = Number(it.quantity) || 1;
+                        const subTotal = (Number(it.price || 0) * qty).toLocaleString();
+                        return '<div class="item-list-row"><span>• ' + fName + ' × ' + qty + '</span><span>' + subTotal + ' บาท</span></div>';
+                    }).join('');
+
+                    return '<div class="order-box ' + ord.status + '">' +
+                        '<div class="order-header">' +
+                            '<h3 style="margin:0;">คำสั่งซื้อ #' + ord.id + '</h3>' +
+                            '<span class="status-tag status-' + ord.status + '">' + getStatusLabel(ord.status) + '</span>' +
+                        '</div>' +
+                        '<div style="font-size:13px; color:#64748b; margin-bottom:8px;">🕒 เวลาที่สั่ง: ' + timeStr + ' น.</div>' +
+                        '<div style="font-size:14px; margin-bottom:6px;"><strong>👤 ผู้สั่ง:</strong> ' + (ord.customer_name || '-') + ' | <strong>โทร:</strong> ' + (ord.customer_phone || '-') + '</div>' +
+                        '<div style="font-size:14px; margin-bottom:6px;"><strong>📍 ที่อยู่จัดส่ง:</strong> ' + (ord.delivery_address || '-') + '</div>' +
+                        '<div style="font-size:14px; margin-bottom:12px;"><strong>💳 การชำระเงิน:</strong> ' + paymentText + '</div>' +
+                        '<div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:12px; border:1px solid #e2e8f0;">' +
+                            itemsHtml +
+                            '<div style="display:flex; justify-content:space-between; font-weight:bold; margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; color:#e11d48; font-size:15px;">' +
+                                '<span>ยอดรวมสุทธิ:</span><span>' + Number(ord.total_amount || 0).toLocaleString() + ' บาท</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="action-group">' + renderActionButtons(ord.id, ord.status) + '</div>' +
+                    '</div>';
+                }).join('');
+            } catch (err) {
+                console.error('Load orders error:', err);
+                container.innerHTML = '<p style="color:red; text-align:center;">เกิดข้อผิดพลาดในการโหลดรายการออเดอร์</p>';
+            }
+        }
+
+        function getStatusLabel(status) {
+            switch(status) {
+                case 'pending': return '⏳ รอรับออเดอร์';
+                case 'confirmed': return '✔ รับออเดอร์แล้ว';
+                case 'preparing': return '🍳 กำลังปรุงอาหาร';
+                case 'ready': return '📦 รอไรเดอร์มารับ';
+                case 'delivering': return '🛵 ไรเดอร์กำลังนำส่ง';
+                case 'completed': return '🎉 จัดส่งสำเร็จ';
+                default: return status;
+            }
+        }
+
+        function renderActionButtons(orderId, status) {
+            if (status === 'pending') {
+                return '<button class="btn-action" style="background:#0284c7;" onclick="updateOrderStatus(' + orderId + ', \'confirmed\')">1. ยืนยันรับออเดอร์</button>';
+            }
+            if (status === 'confirmed') {
+                return '<button class="btn-action" style="background:#d97706;" onclick="updateOrderStatus(' + orderId + ', \'preparing\')">2. เริ่มปรุงอาหาร 🍳</button>';
+            }
+            if (status === 'preparing') {
+                return '<button class="btn-action" style="background:#2563eb;" onclick="updateOrderStatus(' + orderId + ', \'ready\')">3. ปรุงเสร็จแล้ว (ส่งต่อไรเดอร์) 📦</button>';
+            }
+            return '<span style="font-size:13px; color:#64748b; font-weight:bold;">สถานะงาน: ' + getStatusLabel(status) + '</span>';
+        }
+
+        async function updateOrderStatus(orderId, status) {
+            try {
+                const res = await fetch('/api/orders/' + orderId + '/status', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: status })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    loadOrders();
+                    loadWalletBalance();
+                } else {
+                    alert(result.message || 'ไม่สามารถอัปเดตได้');
+                }
+            } catch (e) {
+                alert('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
+            }
+        }
+
+        // ฟังก์ชันระบบกระเป๋าเงิน (Wallet)
+        async function loadWalletBalance() {
+            if (!currentUser.id) return;
+            try {
+                const res = await fetch('/api/wallet/' + currentUser.id + '?_t=' + Date.now(), { cache: 'no-store' });
+                const data = await res.json();
+                if (data.success) {
+                    const balanceEl = document.getElementById('walletBalance');
+                    if (balanceEl) {
+                        balanceEl.textContent = Number(data.balance || 0).toLocaleString('th-TH', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Wallet loading error:", err);
+            }
+        }
+
+        async function requestWithdrawal() {
+            const currentBalance = parseFloat(document.getElementById('walletBalance')?.textContent.replace(/,/g, '') || '0');
+            if (currentBalance <= 0) {
+                alert('ยอดเงินในกระเป๋าของคุณยังไม่เพียงพอสำหรับการถอน');
+                return;
+            }
+
+            const inputAmount = prompt('ยอดเงินที่ถอนได้: ฿' + currentBalance.toFixed(2) + '\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร:', currentBalance.toFixed(2));
+            if (!inputAmount) return;
+
+            const amount = parseFloat(inputAmount);
+            if (isNaN(amount) || amount <= 0) {
+                alert('กรุณากรอกจำนวนเงินให้ถูกต้อง');
+                return;
+            }
+
+            if (amount > currentBalance) {
+                alert('ยอดเงินที่ระบุเกินกว่ายอดเงินคงเหลือในกระเป๋า');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/wallet/withdraw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: Number(currentUser.id), amount: amount })
+                });
+                const result = await res.json();
+                alert(result.message);
+                if (result.success) {
+                    await loadWalletBalance();
+                }
+            } catch (err) {
+                alert('ไม่สามารถทำรายการถอนเงินได้ในขณะนี้');
+            }
+        }
+
+        function openModal() { document.getElementById('regModal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('regModal').style.display = 'none'; }
+
+        async function submitStore(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('storeName').value.trim(),
+                phone: document.getElementById('storePhone').value.trim(),
+                address: document.getElementById('storeAddress').value.trim(),
+                owner_id: currentUser.id
+            };
+
+            try {
+                const res = await fetch('/api/restaurants/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ ' + data.message + '\nรหัสร้านของคุณคือ ID: ' + data.restaurantId);
+                    closeModal();
+                    currentStoreId = data.restaurantId;
+                    currentUser.restaurant_id = currentStoreId;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    await loadStoreDropdown();
+                } else {
+                    alert('❌ ' + (data.message || 'สมัครไม่สำเร็จ'));
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        initMerchant();
+        setInterval(function() {
+            loadOrders();
+            loadWalletBalance();
+        }, 3000);
+    </script>
+</body>
+</html>

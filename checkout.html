@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ชำระเงิน - BestFood Delivery</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .checkout-box {
+            max-width: 650px;
+            margin: 30px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #333;
+        }
+        .form-group input, 
+        .form-group textarea, 
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+        .order-summary-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 15px;
+            color: #495057;
+        }
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px dashed #ced4da;
+            padding-top: 10px;
+            margin-top: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #d90429;
+        }
+        .wallet-status-badge {
+            display: none;
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #065f46;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .wallet-status-badge.insufficient {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+        .btn-quick-topup {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-confirm {
+            width: 100%;
+            background: #10b981;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-confirm:hover {
+            background: #059669;
+        }
+        .btn-confirm:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="header-container">
+            <h1 class="logo">🍴 BestFood Delivery</h1>
+            <nav>
+                <a href="index.html">หน้าแรก</a>
+                <a href="restaurants.html">ร้านอาหาร</a>
+                <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
+                <a href="order.html">📦 คำสั่งซื้อ</a>
+                <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="checkout-box">
+        <h2>📋 ยืนยันคำสั่งซื้อและการจัดส่ง</h2>
+
+        <!-- สรุปรายการอาหารและราคาก่อนสั่ง -->
+        <div class="order-summary-box">
+            <h4 style="margin: 0 0 10px 0; color: #212529;">สรุปรายการคำสั่งซื้อ</h4>
+            <div id="checkout-items">กำลังโหลดรายการอาหาร...</div>
+            <div class="summary-row" style="margin-top: 8px;">
+                <span id="shipping-label">ค่าจัดส่ง</span>
+                <span id="shipping-cost">20 บาท</span>
+            </div>
+            <div class="summary-total">
+                <span>ยอดชำระสุทธิ</span>
+                <span id="grand-total">0 บาท</span>
+            </div>
+        </div>
+
+        <form id="checkoutForm" onsubmit="submitOrder(event)">
+            <div class="form-group">
+                <label>ชื่อผู้สั่ง</label>
+                <input type="text" id="custName" readonly style="background-color: #e9ecef;">
+            </div>
+            <div class="form-group">
+                <label>ที่อยู่จัดส่ง</label>
+                <textarea id="deliveryAddress" rows="3" required placeholder="ระบุบ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์"></textarea>
+            </div>
+            <div class="form-group">
+                <label>ช่องทางการชำระเงิน</label>
+                <select id="paymentMethod" onchange="handlePaymentChange()">
+                    <option value="wallet">💼 ชำระผ่านกระเป๋าเงิน (Wallet)</option>
+                    <option value="cash_on_delivery">💵 เก็บเงินปลายทาง (Cash on Delivery)</option>
+                    <option value="promptpay">📱 โอนเงินผ่าน พร้อมเพย์ (PromptPay)</option>
+                </select>
+
+                <!-- กล่องแสดงยอดเงินคงเหลือในกระเป๋า -->
+                <div id="walletBadge" class="wallet-status-badge">
+                    <div>
+                        <span>ยอดเงินในกระเป๋าของคุณ: </span>
+                        <strong id="userWalletAmount">฿0.00</strong>
+                        <span id="walletWarnText" style="display:none; margin-left: 6px; font-weight:bold;">(ยอดเงินไม่เพียงพอ)</span>
+                    </div>
+                    <button type="button" class="btn-quick-topup" onclick="quickTopup()">+ เติมเงิน</button>
+                </div>
+            </div>
+            <button type="submit" id="btnSubmit" class="btn-confirm">✅ ยืนยันการสั่งซื้อ</button>
+        </form>
+    </main>
+
+    <footer>
+        <h3>🍴 BestFood Delivery</h3>
+        <p>สั่งอาหารง่าย ๆ ส่งตรงถึงบ้าน</p>
+        <p>© 2026 Food Delivery</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const userId = currentUser.id || localStorage.getItem("userId");
+        let cartItems = [];
+        let currentGrandTotal = 0;
+        let customerBalance = 0;
+
+        // เช็กสถานะการล็อกอิน
+        if (!userId) {
+            alert("กรุณาเข้าสู่ระบบก่อนทำรายการสั่งซื้อ");
+            window.location.href = "login.html";
+        } else {
+            document.getElementById("custName").value = currentUser.name || "ลูกค้า";
+            loadCustomerWalletData();
+            loadCheckoutSummary();
+        }
+
+        // โหลดข้อมูลกระเป๋าเงินลูกค้า
+        async function loadCustomerWalletData() {
+            try {
+                const res = await fetch(`/api/wallet/${userId}?_t=${Date.now()}`);
+                const data = await res.json();
+                if (data.success) {
+                    customerBalance = Number(data.balance || 0);
+                    document.getElementById("userWalletAmount").textContent = `฿${customerBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+                    handlePaymentChange();
+                }
+            } catch (err) {
+                console.error("Wallet Load Error:", err);
+            }
+        }
+
+        // เมื่อสลับวิธีชำระเงิน
+        function handlePaymentChange() {
+            const payment = document.getElementById("paymentMethod").value;
+            const walletBadge = document.getElementById("walletBadge");
+            const warnText = document.getElementById("walletWarnText");
+            const btnSubmit = document.getElementById("btnSubmit");
+
+            if (payment === "wallet") {
+                walletBadge.style.display = "flex";
+                if (customerBalance < currentGrandTotal) {
+                    walletBadge.classList.add("insufficient");
+                    warnText.style.display = "inline";
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerText = "❌ ยอดเงินในกระเป๋าไม่พอ (กรุณาเติมเงิน)";
+                } else {
+                    walletBadge.classList.remove("insufficient");
+                    warnText.style.display = "none";
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ (หักเงินทันที)";
+                }
+            } else {
+                walletBadge.style.display = "none";
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ";
+            }
+        }
+
+        // ปุ่มเติมเงินด่วน
+        async function quickTopup() {
+            const input = prompt("ระบุจำนวนเงินที่ต้องการเติมเข้ากระเป๋า (บาท):", "200");
+            if (input === null) return;
+            const amount = Number(input);
+            if (isNaN(amount) || amount <= 0) {
+                alert("กรุณากรอกจำนวนเงินให้ถูกต้อง");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/wallet/topup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId: Number(userId), amount: amount })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert(`🎉 ${result.message}`);
+                    await loadCustomerWalletData();
+                } else {
+                    alert(result.message || "เติมเงินไม่สำเร็จ");
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+            }
+        }
+
+        function resolveRestaurantId(foodId, existingRId) {
+            const rId = Number(existingRId || 0);
+            if (rId > 0) return rId;
+
+            const fId = Number(foodId);
+            if (fId >= 18 && fId <= 21) return 1;      // ร้านกะเพราอร่อย
+            if (fId >= 4 && fId <= 6) return 2;        // Pizza House
+            if (fId >= 7 && fId <= 9) return 3;        // Burger Station
+            if (fId >= 11 && fId <= 13) return 4;      // ก๋วยเตี๋ยวเรือเจ้าอร่อย
+            return 1;
+        }
+
+        async function loadCheckoutSummary() {
+            const itemsContainer = document.getElementById("checkout-items");
+            const grandTotalEl = document.getElementById("grand-total");
+            const shippingLabelEl = document.getElementById("shipping-label");
+            const shippingCostEl = document.getElementById("shipping-cost");
+
+            try {
+                const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
+                const result = await res.json();
+                const rawItems = result.data || result.items || (Array.isArray(result) ? result : []);
+
+                if (!rawItems || rawItems.length === 0) {
+                    itemsContainer.innerHTML = "<p style='color:#dc3545;'>ไม่มีสินค้าในตะกร้า</p>";
+                    document.getElementById("btnSubmit").disabled = true;
+                    return;
+                }
+
+                const grouped = {};
+                rawItems.forEach(it => {
+                    const fId = Number(it.food_id || it.foodId || it.id);
+                    const qty = Number(it.quantity || 1);
+                    const price = Number(it.price || 0);
+                    const name = it.name || it.food_name || `อาหารรหัส #${fId}`;
+                    const rId = resolveRestaurantId(fId, it.restaurant_id || it.restaurantId);
+
+                    if (!grouped[fId]) {
+                        grouped[fId] = {
+                            food_id: fId,
+                            name: name,
+                            price: price,
+                            quantity: qty,
+                            restaurant_id: rId
+                        };
+                    } else {
+                        grouped[fId].quantity += qty;
+                    }
+                });
+
+                cartItems = Object.values(grouped);
+
+                const distinctStores = new Set(cartItems.map(it => it.restaurant_id));
+                const storeCount = distinctStores.size;
+                const totalShipping = storeCount * 20;
+
+                if (shippingLabelEl) {
+                    shippingLabelEl.textContent = storeCount > 1 ? `ค่าจัดส่ง (${storeCount} ร้าน × 20 บ.)` : "ค่าจัดส่ง";
+                }
+                if (shippingCostEl) {
+                    shippingCostEl.textContent = `${totalShipping} บาท`;
+                }
+
+                let subtotal = 0;
+                itemsContainer.innerHTML = cartItems.map(it => {
+                    const total = it.price * it.quantity;
+                    subtotal += total;
+                    return `
+                        <div class="summary-row">
+                            <span>${it.name} × ${it.quantity}</span>
+                            <span>${total.toLocaleString()} ฿</span>
+                        </div>
+                    `;
+                }).join("");
+
+                currentGrandTotal = subtotal + totalShipping;
+                grandTotalEl.textContent = `${currentGrandTotal.toLocaleString()} บาท`;
+
+                handlePaymentChange();
+
+            } catch (error) {
+                console.error("Summary Load Error:", error);
+                itemsContainer.innerHTML = "<p>ไม่สามารถโหลดสรุปข้อมูลอาหารได้</p>";
+            }
+        }
+
+        async function submitOrder(e) {
+            e.preventDefault();
+            if (cartItems.length === 0) {
+                alert("ไม่มีสินค้าในตะกร้า กรุณาเลือกสินค้าก่อน");
+                window.location.href = "restaurants.html";
+                return;
+            }
+
+            const address = document.getElementById("deliveryAddress").value.trim();
+            const payment = document.getElementById("paymentMethod").value;
+            const btnSubmit = document.getElementById("btnSubmit");
+
+            if (payment === "wallet" && customerBalance < currentGrandTotal) {
+                alert("ยอดเงินในกระเป๋าไม่เพียงพอ กรุณากดเติมเงินก่อนทำรายการสั่งซื้อ");
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "⏳ กำลังบันทึกคำสั่งซื้อและตัดเงิน...";
+
+            try {
+                const storeGroups = {};
+                cartItems.forEach(it => {
+                    const rId = resolveRestaurantId(it.food_id, it.restaurant_id);
+                    if (!storeGroups[rId]) {
+                        storeGroups[rId] = [];
+                    }
+                    storeGroups[rId].push(it);
+                });
+
+                const createdOrderIds = [];
+                for (const [rId, items] of Object.entries(storeGroups)) {
+                    const storeSubtotal = items.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+                    const storeGrandTotal = storeSubtotal + 20;
+
+                    const orderPayload = {
+                        user_id: Number(userId),
+                        restaurant_id: Number(rId),
+                        delivery_address: address,
+                        payment_method: payment,
+                        total_amount: storeGrandTotal,
+                        items: items.map(it => ({
+                            food_id: it.food_id,
+                            name: it.name,
+                            price: it.price,
+                            quantity: it.quantity
+                        }))
+                    };
+
+                    const res = await fetch("/api/orders", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(orderPayload)
+                    });
+
+                    const result = await res.json();
+                    if (result.success && result.orderId) {
+                        createdOrderIds.push(result.orderId);
+                    } else {
+                        alert(result.message || "เกิดข้อผิดพลาดในการบันทึกคำสั่งซื้อ");
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ";
+                        return;
+                    }
+                }
+
+                if (createdOrderIds.length > 0) {
+                    await fetch(`/api/cart/${userId}`, { method: "DELETE" });
+
+                    if (window.cartManager) {
+                        await window.cartManager.updateCartBadge();
+                    }
+
+                    alert(`🎉 สั่งซื้อและชำระเงินสำเร็จ! (แยกคำสั่งซื้อตามร้านทั้งหมด ${createdOrderIds.length} รายการ)`);
+
+                    if (createdOrderIds.length === 1) {
+                        window.location.href = `order.html?orderId=${createdOrderIds[0]}`;
+                    } else {
+                        window.location.href = "order.html";
+                    }
+                }
+
+            } catch (err) {
+                console.error("Order Submit Error:", err);
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ";
+            }
+        }
+    </script>
+</body>
+</html>
