@@ -79,7 +79,8 @@
             }
 
             try {
-                const response = await fetch("http://localhost:3000/api/register", {
+                // แก้ไขเป็น /api/register เพื่อเรียก API ได้โดยตรงทั้งบน Render และ Local
+                const response = await fetch("/api/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ name, email, password })
