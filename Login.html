@@ -58,7 +58,8 @@
             const password = document.getElementById("password").value;
 
             try {
-                const response = await fetch("http://localhost:3000/api/login", {
+                // เรียกผ่าน Relative Path /api/login โดยตรงเพื่อให้ทำงานได้ทั้งบน Render และเครื่องตัวเอง
+                const response = await fetch("/api/login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password })
