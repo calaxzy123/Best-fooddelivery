@@ -28,36 +28,36 @@
     <p>เบอร์เกอร์ทำสดใหม่ทุกออเดอร์</p>
 
     <section class="food-grid">
-        <!-- Classic Burger (food_id = 5, restaurant_id = 3) -->
+        <!-- Classic Burger (food_id = 8, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/classic burger.jpg" alt="Classic Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Classic Burger</h3>
                 <p>เบอร์เกอร์เนื้อพร้อมผักสดและซอสสูตรพิเศษ</p>
                 <strong>129 บาท</strong>
-                <button type="button" onclick="addToCart('Classic Burger', 129, 'Image/classic burger.jpg', 3, 8)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="handleBurgerAddToCart('Classic Burger', 129, 'Image/classic burger.jpg', 3, 8)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
 
-        <!-- Cheese Burger (food_id = 6, restaurant_id = 3) -->
+        <!-- Cheese Burger (food_id = 9, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/burgercheese.jpg" alt="Cheese Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Cheese Burger</h3>
                 <p>เบอร์เกอร์เนื้อและชีสเยิ้ม ๆ</p>
                 <strong>149 บาท</strong>
-                <button type="button" onclick="addToCart('Cheese Burger', 149, 'Image/burgercheese.jpg', 3, 9)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="handleBurgerAddToCart('Cheese Burger', 149, 'Image/burgercheese.jpg', 3, 9)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
 
-        <!-- Chicken Burger (food_id = 7, restaurant_id = 3) -->
+        <!-- Chicken Burger (food_id = 10, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/chicken burger.jpg" alt="Chicken Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Chicken Burger</h3>
                 <p>เบอร์เกอร์ไก่กรอบพร้อมผักสด</p>
                 <strong>139 บาท</strong>
-                <button type="button" onclick="addToCart('Chicken Burger', 139, 'Image/chicken burger.jpg', 3, 10)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="handleBurgerAddToCart('Chicken Burger', 139, 'Image/chicken burger.jpg', 3, 10)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
     </section>
@@ -67,8 +67,61 @@
     <p>© 2026 Food Delivery</p>
 </footer>
 
-<!-- เรียกใช้ script.js ตัวหลักเพียงตัวเดียวเพื่อไม่ให้ชนกัน -->
 <script src="script.js"></script>
+
+<script>
+    async function handleBurgerAddToCart(name, price, image, restaurantId, foodId) {
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : null;
+        const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+
+        if (!userId) {
+            alert("กรุณาเข้าสู่ระบบก่อนเลือกซื้ออาหาร");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            // ยิงเข้าตาราง carts ใน MySQL โดยตรง
+            const res = await fetch("/api/cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: Number(userId),
+                    user_id: Number(userId),
+                    foodId: Number(foodId),
+                    food_id: Number(foodId),
+                    restaurantId: Number(restaurantId),
+                    restaurant_id: Number(restaurantId),
+                    quantity: 1
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(`✅ เพิ่ม "${name}" ลงในตะกร้าเรียบร้อยแล้ว!`);
+                
+                // อัปเดตตัวเลขนับตะกร้าบน Header
+                const cartCountEl = document.getElementById("cart-count");
+                if (cartCountEl) {
+                    const cRes = await fetch(`/api/cart/${userId}?_t=${Date.now()}`);
+                    const cData = await cRes.json();
+                    const items = cData.data || cData.items || [];
+                    const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+                    cartCountEl.textContent = totalQty;
+                }
+            } else {
+                alert(data.message || "ไม่สามารถเพิ่มลงในตะกร้าได้");
+            }
+        } catch (err) {
+            console.error("Cart error:", err);
+            // fallback หากเซิร์ฟเวอร์มีปัญหา
+            if (typeof addToCart === "function") {
+                addToCart(name, price, image, restaurantId, foodId);
+            }
+        }
+    }
+</script>
 
 </body>
 </html>
