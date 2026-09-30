@@ -1,0 +1,22 @@
+--- 1. ตาราง users & restaurants ใน DB ---
+--- 2. ใน login.html เซฟคีย์อะไร ---
+
+Login.html:75:                // 1. บันทึกข้อมูลบัญชีและบทบาทลง localStorage
+Login.html:77:                localStorage.setItem("currentUser", JSON.stringify(user));
+Login.html:78:                localStorage.setItem("userId", user.id);
+Login.html:79:                localStorage.setItem("userName", user.name);
+Login.html:80:                localStorage.setItem("userRole", user.role);
+--- 3. ใน order.html และ checkout.html ส่งอะไร ---
+checkout.html:303:                    const rId = resolveRestaurantId(fId, it.restaurant_id || it.restaurantId);
+checkout.html:311:                            restaurant_id: rId
+checkout.html:320:                const distinctStores = new Set(cartItems.map(it => it.restaurant_id));
+checkout.html:377:                    const rId = resolveRestaurantId(it.food_id, it.restaurant_id);
+checkout.html:391:                        restaurant_id: Number(rId),
+order.html:40:        .status-cancelled { background: #f8d7da; color: #721c24; }
+order.html:142:        .btn-cancel {
+order.html:153:        .btn-cancel:hover {
+order.html:237:                <div id="cancelOrderBox" style="text-align: center; margin: 25px 0 15px 0; display: 
+none;">
+order.html:238:                    <button type="button" class="btn-cancel" onclick="cancelCurrentOrder()">
+
+
