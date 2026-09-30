@@ -132,22 +132,35 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // --- AUTO-SEED เมนูอาหาร 13 รายการ (แยก Pizza และ Burger ชัดเจน 100%) ---
+    // --- AUTO-SEED ร้านค้าหลัก 4 ร้าน (ป้องกัน ID ร้านค้าสูญหายบน Cloud) ---
+    await pool.query(`
+      INSERT INTO restaurants (id, owner_id, name, phone, address, status) VALUES
+      (1, 1, 'ร้านกะเพราอร่อย', '081-111-1111', 'ซอยสุขุมวิท 101/1 กทม.', 'open'),
+      (2, 2, 'Pizza House', '082-222-2222', 'สีลมซอย 3 กทม.', 'open'),
+      (3, 3, 'Burger Station', '083-333-3333', 'ลาดพร้าว 71 กทม.', 'open'),
+      (4, 4, 'ก๋วยเตี๋ยวเรือเจ้าอร่อย', '084-444-4444', 'พหลโยธิน 32 กทม.', 'open')
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        phone = VALUES(phone),
+        address = VALUES(address);
+    `);
+
+    // --- AUTO-SEED เมนูอาหาร 13 รายการที่ตรงตามไฟล์รูปภาพจริงในโปรเจกต์ 100% ---
     await pool.query(`
       INSERT INTO foods (id, restaurant_id, name, price, image) VALUES 
       (1, 1, 'ข้าวกะเพราหมูสับ', 50.00, 'Image/kapao-moosub.jpg'),
       (2, 1, 'ข้าวกะเพราไก่', 50.00, 'Image/kapao-kai.jpg'),
-      (3, 1, 'ข้าวกะเพราเนื้อ', 70.00, 'Image/kapao-nuea.jpg'),
-      (4, 1, 'ไข่ดาว', 10.00, 'Image/fried-egg.jpg'),
+      (3, 1, 'ข้าวกะเพราเนื้อ', 70.00, 'Image/kapao-nae.jpg'),
+      (4, 1, 'ไข่ดาว', 10.00, 'Image/dao.jpg'),
       (5, 2, 'Pizza Margherita', 199.00, 'Image/pizzamargherita.jpg'),
       (6, 2, 'Pizza Hawaiian', 229.00, 'Image/pizzahawaiian.jpg'),
       (7, 2, 'Pepperoni Pizza', 249.00, 'Image/pepperoni pizza.jpg'),
       (8, 3, 'Classic Burger', 129.00, 'Image/classic burger.jpg'),
       (9, 3, 'Cheese Burger', 149.00, 'Image/burgercheese.jpg'),
       (10, 3, 'Chicken Burger', 139.00, 'Image/chicken burger.jpg'),
-      (11, 4, 'ก๋วยเตี๋ยวเรือหมูน้ำตก', 45.00, 'Image/noodle-pork.jpg'),
-      (12, 4, 'ก๋วยเตี๋ยวเรือเนื้อน้ำตก', 55.00, 'Image/noodle-beef.jpg'),
-      (13, 4, 'กากหมูเจียวกรอบ', 20.00, 'Image/pork-crackling.jpg')
+      (11, 4, 'ก๋วยเตี๋ยวต้มยำ', 50.00, 'Image/noodle-tomyum.jpg'),
+      (12, 4, 'ก๋วยเตี๋ยวหมู', 45.00, 'Image/noodle-pork.jpg'),
+      (13, 4, 'ก๋วยเตี๋ยวเนื้อ', 60.00, 'Image/noodle-beef.jpg')
       ON DUPLICATE KEY UPDATE 
         restaurant_id = VALUES(restaurant_id),
         name = VALUES(name),
@@ -155,7 +168,7 @@ async function initializeDatabaseTables() {
         image = VALUES(image);
     `);
 
-    console.log('✅ [Database] โครงสร้างตารางและเมนูอาหารทั้งหมดพร้อมใช้งานสมบูรณ์');
+    console.log('✅ [Database] โครงสร้างตาราง ร้านค้าทั้ง 4 ร้าน และเมนูอาหารทั้งหมดพร้อมใช้งานสมบูรณ์');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
@@ -347,7 +360,7 @@ app.patch('/api/restaurants/:id', async (req, res) => {
 
 app.get('/api/restaurants/:id/foods', (req, res) => foodController.getFoodsByRestaurant(req, res));
 
-// 3. เส้นทางตะกร้าสินค้า (Cart) - ซิงค์ร้านค้าและรายการอาหารตรงกัน 100%
+// 3. เส้นทางตะกร้าสินค้า (Cart)
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -366,33 +379,12 @@ app.get('/api/cart/:userId', async (req, res) => {
             WHEN c.food_id BETWEEN 5 AND 7 THEN 2
             WHEN c.food_id BETWEEN 8 AND 10 THEN 3
             WHEN c.food_id BETWEEN 11 AND 13 THEN 4
-            ELSE 3
+            ELSE 1
           END
         ) AS restaurant_id,
-        COALESCE(NULLIF(f.name, ''), 
-          CASE c.food_id 
-            WHEN 8 THEN 'Classic Burger' 
-            WHEN 9 THEN 'Cheese Burger' 
-            WHEN 10 THEN 'Chicken Burger' 
-            ELSE CONCAT('อาหารรหัส #', c.food_id) 
-          END
-        ) AS name, 
-        COALESCE(NULLIF(f.price, 0), 
-          CASE c.food_id 
-            WHEN 8 THEN 129.00 
-            WHEN 9 THEN 149.00 
-            WHEN 10 THEN 139.00 
-            ELSE 50.00 
-          END
-        ) AS price, 
-        COALESCE(NULLIF(f.image, ''), 
-          CASE c.food_id 
-            WHEN 8 THEN 'Image/classic burger.jpg' 
-            WHEN 9 THEN 'Image/burgercheese.jpg' 
-            WHEN 10 THEN 'Image/chicken burger.jpg' 
-            ELSE 'Image/logoweb.png' 
-          END
-        ) AS image
+        COALESCE(NULLIF(f.name, ''), CONCAT('อาหารรหัส #', c.food_id)) AS name, 
+        COALESCE(NULLIF(f.price, 0), 50.00) AS price, 
+        COALESCE(NULLIF(f.image, ''), 'Image/logoweb.png') AS image
       FROM carts c
       LEFT JOIN foods f ON c.food_id = f.id
       WHERE c.user_id = ?
@@ -422,7 +414,6 @@ app.post('/api/cart', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ข้อมูลตะกร้าไม่ครบถ้วน' });
     }
 
-    // กำหนดร้านค้าของอาหารอัตโนมัติหากไม่มีส่งมา
     let resolvedRid = rid;
     if (!resolvedRid) {
       const [fRows] = await pool.query('SELECT restaurant_id FROM foods WHERE id = ?', [fid]);
@@ -592,10 +583,8 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
       });
     }
 
-    // ปรับสถานะเป็น cancelled
     await pool.query('UPDATE orders SET status = "cancelled" WHERE id = ?', [orderId]);
 
-    // คืนเงินหากชำระด้วย Wallet
     if (order.payment_method === 'wallet' && order.status !== 'cancelled') {
       const refundAmount = Number(order.total_amount) || 0;
       const targetUid = userId || order.user_id;
@@ -647,11 +636,11 @@ app.get('/api/rider/orders', async (req, res) => {
     const [orders] = await pool.query(`
       SELECT o.id, o.restaurant_id, o.rider_id, o.delivery_address, o.payment_method, 
              o.total_amount, o.status, o.created_at,
-             u.name AS customer_name,
-             u.phone AS customer_phone,
-             r.name AS restaurant_name
+             COALESCE(u.name, 'ลูกค้า') AS customer_name,
+             COALESCE(u.phone, '-') AS customer_phone,
+             COALESCE(r.name, '') AS restaurant_name
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN restaurants r ON o.restaurant_id = r.id
       ORDER BY o.created_at DESC
       LIMIT 30
