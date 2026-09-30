@@ -263,16 +263,13 @@
 
         // จับคู่ ID ร้านค้าให้ตรงกับมาตรฐานจริง 100%
         function resolveRestaurantId(foodId, existingRId) {
-            const rId = Number(existingRId || 0);
-            if (rId > 0) return rId;
-
-            const fId = Number(foodId);
-            if (fId >= 1 && fId <= 4) return 1;     // ร้านกะเพราอร่อย (ID: 1)
-            if (fId >= 8 && fId <= 10) return 2;    // Pizza House (ID: 2)
-            if (fId >= 5 && fId <= 7) return 3;     // Burger Station (ID: 3)
-            if (fId >= 11 && fId <= 13) return 4;   // ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)
-            return 1;
-        }
+    const fId = Number(foodId);
+    if (fId >= 1 && fId <= 4) return 1;
+    if (fId >= 5 && fId <= 7) return 2;
+    if (fId >= 8 && fId <= 10) return 3;
+    if (fId >= 11 && fId <= 13) return 4;
+    return Number(existingRId || 1);
+}
 
         async function loadCheckoutSummary() {
             const itemsContainer = document.getElementById("checkout-items");
