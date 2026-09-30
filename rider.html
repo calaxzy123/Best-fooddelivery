@@ -31,7 +31,6 @@
             margin: 25px auto;
             padding: 0 15px;
         }
-        /* แถบโปรไฟล์ไรเดอร์ */
         .rider-profile-box {
             background: #fff;
             padding: 18px 24px;
@@ -45,7 +44,6 @@
             gap: 15px;
             margin-bottom: 20px;
         }
-        /* การ์ดกระเป๋าเงินไรเดอร์ */
         .rider-wallet-card {
             background: #ffffff;
             border-radius: 12px;
@@ -186,7 +184,7 @@
     </header>
 
     <main class="rider-container">
-        <!-- การ์ดแสดงโปรไฟล์ไรเดอร์ (Rider Identity Profile) -->
+        <!-- การ์ดแสดงโปรไฟล์ไรเดอร์ -->
         <section class="rider-profile-box">
             <div>
                 <h3 style="margin: 0 0 6px 0; font-size: 18px; color: #0f172a;">
@@ -203,7 +201,7 @@
             </span>
         </section>
 
-        <!-- การ์ดกระเป๋าเงินค่ารอบไรเดอร์ (Rider Wallet Card) -->
+        <!-- การ์ดกระเป๋าเงินค่ารอบไรเดอร์ -->
         <section class="rider-wallet-card">
             <div>
                 <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ค่ารอบสะสมในกระเป๋า (รับ 20 บาท/ออเดอร์ เมื่อส่งมอบสำเร็จ)</span>
@@ -228,7 +226,20 @@
     </main>
 
     <script>
-        // 1. ตรวจสอบสิทธิ์ผู้ใช้งาน (Rider Role Guard)
+        const storeCatalog = {
+            1: "🍛 ร้านกะเพราอร่อย",
+            2: "🍕 Pizza House",
+            3: "🍔 Burger Station",
+            4: "🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย"
+        };
+
+        const fallbackMenuCatalog = {
+            1: "ข้าวกะเพราหมูสับ", 2: "ข้าวกะเพราไก่", 3: "ข้าวกะเพราเนื้อ", 4: "ไข่ดาว",
+            5: "Pizza Margherita", 6: "Pizza Hawaiian", 7: "Pepperoni Pizza",
+            8: "Classic Burger", 9: "Cheese Burger", 10: "Chicken Burger",
+            11: "ก๋วยเตี๋ยวต้มยำ", 12: "ก๋วยเตี๋ยวหมู", 13: "ก๋วยเตี๋ยวเนื้อ"
+        };
+
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         const role = (currentUser.role || '').toLowerCase();
 
@@ -237,7 +248,6 @@
             window.location.href = 'login.html';
         }
 
-        // แสดงข้อมูลโปรไฟล์
         document.getElementById('riderNameNav').innerText = `${currentUser.name || 'ไรเดอร์'} (${role})`;
         document.getElementById('rProfileName').innerText = currentUser.name || 'สมชาย สายซิ่ง';
         document.getElementById('rProfilePhone').innerText = currentUser.phone || '089-111-2233';
@@ -246,7 +256,6 @@
 
         let activeGpsWatchId = null;
 
-        // 2. ดึงยอดเงินกระเป๋าไรเดอร์
         async function loadRiderWallet() {
             if (!currentUser.id) return;
             try {
@@ -266,7 +275,6 @@
             }
         }
 
-        // 3. ฟังก์ชันแจ้งถอนเงินเข้าบัญชี
         async function requestRiderWithdrawal() {
             const currentBalance = parseFloat(document.getElementById('riderWalletBalance')?.textContent.replace(/,/g, '') || '0');
             if (currentBalance <= 0) {
@@ -304,7 +312,6 @@
             }
         }
 
-        // 4. ดึงรายการงานส่งอาหาร
         async function loadRiderOrders() {
             const container = document.getElementById("riderOrdersList");
             try {
@@ -364,19 +371,27 @@
                         actionHtml = '<span style="color: #059669; font-weight: bold; font-size: 14px;">✔ ส่งถึงมือลูกค้าแล้ว</span>';
                     }
 
-                    const paymentText = ord.payment_method === 'cash_on_delivery' 
-                        ? '<span style="color:#d97706; font-weight:bold;">💵 เก็บเงินปลายทาง (COD)</span>' 
-                        : '<span style="color:#2563eb; font-weight:bold;">📱 โอนเงิน / พร้อมเพย์</span>';
+                    const pMethod = String(ord.payment_method || '').toLowerCase();
+                    let paymentText = '<span style="color:#2563eb; font-weight:bold;">📱 โอนเงิน / พร้อมเพย์</span>';
+                    if (pMethod === 'wallet') {
+                        paymentText = '<span style="color:#059669; font-weight:bold;">💼 ชำระผ่านกระเป๋าเงิน (ไม่ต้องเก็บเงินสด)</span>';
+                    } else if (pMethod.includes('cash') || pMethod.includes('ปลายทาง')) {
+                        paymentText = '<span style="color:#d97706; font-weight:bold;">💵 เก็บเงินปลายทาง (COD)</span>';
+                    }
 
                     const formattedDate = ord.created_at 
                         ? new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
                         : '-';
 
+                    const rId = Number(ord.restaurant_id || 1);
+                    const storeName = ord.restaurant_name || storeCatalog[rId] || `ร้านอาหาร #${rId}`;
+
                     const items = ord.items || [];
                     let itemsHtml = '';
                     if (items.length > 0) {
                         const itemRows = items.map(it => {
-                            const fName = it.food_name || it.name || 'อาหาร';
+                            const fid = Number(it.food_id || it.id);
+                            const fName = it.food_name || it.name || fallbackMenuCatalog[fid] || `อาหารรหัส #${fid}`;
                             const qty = Number(it.quantity) || 1;
                             const pr = (Number(it.price || 0) * qty).toLocaleString();
                             return `<div style="display:flex; justify-content:space-between; padding:3px 0;"><span>• ${fName} × ${qty}</span><span>${pr} บาท</span></div>`;
@@ -388,7 +403,7 @@
                         <div class="order-card ${ord.status}">
                             <div class="card-top">
                                 <div>
-                                    <h3 style="margin: 0 0 4px 0; color: #0f172a;">คำสั่งซื้อ #${ord.id} - ${ord.restaurant_name || 'ร้านอาหาร'}</h3>
+                                    <h3 style="margin: 0 0 4px 0; color: #0f172a;">คำสั่งซื้อ #${ord.id} - ${storeName}</h3>
                                     <div style="font-size: 13px; color: #64748b;">🕒 เวลาที่สั่งซื้อ: ${formattedDate} น.</div>
                                 </div>
                                 ${statusBadge}
@@ -398,7 +413,7 @@
                                 <div><strong>👤 ชื่อลูกค้า:</strong> ${ord.customer_name || '-'} | <strong>โทร:</strong> ${ord.customer_phone || '-'}</div>
                                 <div><strong>💳 รูปแบบชำระ:</strong> ${paymentText}</div>
                                 <div><strong>💰 ยอดชำระสุทธิ:</strong> <span style="color: #e11d48; font-weight: bold; font-size: 15px;">${Number(ord.total_amount || 0).toLocaleString()} บาท</span></div>
-                                <div><strong>🏪 ร้านค้า:</strong> ${ord.restaurant_name || 'รหัส #' + (ord.restaurant_id || '-')}</div>
+                                <div><strong>🏪 ร้านค้า:</strong> ${storeName}</div>
                                 <div style="grid-column: span 2;">
                                     <strong>📍 จุดส่งมอบอาหาร:</strong> ${ord.delivery_address || '-'}
                                 </div>
@@ -419,7 +434,6 @@
             }
         }
 
-        // 5. ส่งพิกัด GPS
         function startTrackingLocation(orderId) {
             if (activeGpsWatchId !== null) return;
 
@@ -467,7 +481,6 @@
             }
         }
 
-        // 6. อัปเดตสถานะงาน
         async function handleRiderAction(orderId, nextStatus, confirmMsg) {
             if (!confirm(confirmMsg)) return;
 
@@ -502,7 +515,6 @@
             window.location.href = 'login.html';
         }
 
-        // เริ่มต้นการทำงาน
         loadRiderOrders();
         loadRiderWallet();
         setInterval(() => {
