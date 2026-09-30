@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ร้านอาหาร - BestFood Delivery</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .restaurant-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .restaurant-image {
+            height: 180px;
+            overflow: hidden;
+            border-radius: 10px;
+            background: #f1f5f9;
+        }
+        .restaurant-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
 </head>
 
 <body>
@@ -14,7 +32,7 @@
         <h1 class="logo">🍴 BestFood Delivery</h1>
         <nav>
             <a href="index.html">หน้าแรก</a>
-            <a href="restaurants.html">ร้านอาหาร</a>
+            <a href="restaurants.html" style="font-weight: bold; color: #2563eb;">ร้านอาหาร</a>
             <a href="cart.html">🛒 ตะกร้า (<span id="cart-count">0</span>)</a>
             <a href="order.html">📦 คำสั่งซื้อ</a>
             <a href="login.html" id="authNav">เข้าสู่ระบบ</a>
@@ -25,62 +43,62 @@
 <main style="max-width: 1100px; margin: 30px auto; padding: 0 20px;">
 
     <h2>🍽️ ร้านอาหารทั้งหมด</h2>
-    <p style="color: #6c757d; margin-bottom: 25px;">รวมร้านเด็ดรสชาติอร่อย ส่งตรงถึงหน้าบ้านคุณ</p>
+    <p style="color: #6c757d; margin-bottom: 25px;" id="pageSubtitle">รวมร้านเด็ดรสชาติอร่อย ส่งตรงถึงหน้าบ้านคุณ</p>
 
-    <section class="restaurant-grid">
+    <section class="restaurant-grid" id="restaurantGrid">
 
         <!-- 1. ร้านกะเพราอร่อย -->
-        <article class="restaurant-card">
+        <article class="restaurant-card" data-name="ร้านกะเพราอร่อย กะเพรา อาหารตามสั่ง">
             <div class="restaurant-image">
-                <img src="Image/logokapao.jpg" alt="ร้านกะเพราอร่อย" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                <img src="Image/logokapao.jpg" alt="ร้านกะเพราอร่อย" onerror="this.onerror=null; this.src='Image/kapao-moosub.jpg';">
             </div>
             <div class="restaurant-content">
                 <h3>ร้านกะเพราอร่อย</h3>
-                <p>อาหารไทย อร่อยไม่ซ้ำ เพิ่งหัดทำวันแรก</p>
-                <p>⭐ 4.8</p>
-                <p>ค่าส่ง ฿20</p>
-                <a href="menu.html" class="btn">ดูเมนู</a>
+                <p>อาหารตามสั่งรสจัดจ้าน กะเพราแท้สูตรโบราณ</p>
+                <p>⭐ 4.8 · อาหารตามสั่ง</p>
+                <p style="color: #059669; font-weight: bold;">🚚 ค่าส่ง ฿20</p>
+                <a href="menu.html?restaurantId=1" class="btn">ดูเมนู</a>
             </div>
         </article>
 
         <!-- 2. Pizza House -->
-        <article class="restaurant-card">
+        <article class="restaurant-card" data-name="Pizza House พิซซ่า pizza">
             <div class="restaurant-image">
-                <img src="Image/logopizza.png" alt="Pizza House" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                <img src="Image/logopizza.jpg" alt="Pizza House" onerror="this.onerror=null; this.src='Image/pizzamargherita.jpg';">
             </div>
             <div class="restaurant-content">
                 <h3>Pizza House</h3>
-                <p>Pizza อร่อยเต็มเปี่ยม โซเดียมเต็มคำ</p>
-                <p>⭐ 4.7</p>
-                <p>ค่าส่ง ฿30</p>
+                <p>พิซซ่าเตาถ่าน แป้งหนานุ่ม ชีสเยิ้มสะใจ</p>
+                <p>⭐ 4.7 · พิซซ่า</p>
+                <p style="color: #059669; font-weight: bold;">🚚 ค่าส่ง ฿20</p>
                 <a href="pizza.html" class="btn">ดูเมนู</a>
             </div>
         </article>
 
         <!-- 3. Burger Station -->
-        <article class="restaurant-card">
+        <article class="restaurant-card" data-name="Burger Station เบอร์เกอร์ burger">
             <div class="restaurant-image">
-                <img src="Image/logoburger.jpg" alt="Burger Station" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                <img src="Image/logoburger.jpg" alt="Burger Station" onerror="this.onerror=null; this.src='Image/burgercheese.jpg';">
             </div>
             <div class="restaurant-content">
                 <h3>Burger Station</h3>
-                <p>Burger รับรองความอร่อย กินง่าย ถ่ายไว</p>
-                <p>⭐ 4.6</p>
-                <p>ค่าส่ง ฿25</p>
+                <p>เบอร์เกอร์เนื้อพรีเมียม ขนมปังบริออชทำสดใหม่</p>
+                <p>⭐ 4.6 · เบอร์เกอร์</p>
+                <p style="color: #059669; font-weight: bold;">🚚 ค่าส่ง ฿20</p>
                 <a href="burger.html" class="btn">ดูเมนู</a>
             </div>
         </article>
 
-        <!-- 4. Noodle Original (แก้ไขรูปเป็น noodle-logo.jpg) -->
-        <article class="restaurant-card">
+        <!-- 4. ก๋วยเตี๋ยวเรือเจ้าอร่อย -->
+        <article class="restaurant-card" data-name="ก๋วยเตี๋ยวเรือเจ้าอร่อย ก๋วยเตี๋ยว noodle">
             <div class="restaurant-image">
-                <img src="Image/noodle-logo.jpg" alt="Noodle Original" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                <img src="Image/noodle-pork.jpg" alt="ก๋วยเตี๋ยวเรือเจ้าอร่อย" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             </div>
             <div class="restaurant-content">
-                <h3>Noodle Original</h3>
-                <p>ก๋วยเตี๋ยวอร่อยแบบไม่ต้องปรุง เพราะปรุงไปแล้ว</p>
-                <p>⭐ 4.5</p>
-                <p>ค่าส่ง ฿15</p>
+                <h3>ก๋วยเตี๋ยวเรือเจ้าอร่อย</h3>
+                <p>ก๋วยเตี๋ยวน้ำตกเข้มข้น รสเด็ดจัดจ้านไม่ต้องปรุง</p>
+                <p>⭐ 4.9 · ก๋วยเตี๋ยว</p>
+                <p style="color: #059669; font-weight: bold;">🚚 ค่าส่ง ฿20</p>
                 <a href="noodles.html" class="btn">ดูเมนู</a>
             </div>
         </article>
@@ -96,6 +114,53 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", async () => {
+        // อัปเดตตัวเลขในตะกร้า
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : null;
+        const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+
+        if (userId) {
+            try {
+                const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
+                const json = await res.json();
+                const items = json.data || json.items || [];
+                const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+                const badge = document.getElementById("cart-count");
+                if (badge) badge.textContent = totalQty;
+            } catch (e) {}
+        }
+
+        // รองรับระบบค้นหาจากหน้าแรก
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchQuery = (urlParams.get("search") || "").trim().toLowerCase();
+
+        if (searchQuery) {
+            document.getElementById("pageSubtitle").innerText = `ผลการค้นหาสำหรับ: "${searchQuery}"`;
+            const cards = document.querySelectorAll(".restaurant-card");
+            let found = 0;
+            cards.forEach(card => {
+                const text = (card.getAttribute("data-name") || "").toLowerCase();
+                if (text.includes(searchQuery)) {
+                    card.style.display = "flex";
+                    found++;
+                } else {
+                    card.style.display = "none";
+                }
+            });
+
+            if (found === 0) {
+                document.getElementById("restaurantGrid").innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 40px; background: white; border-radius: 12px; color: #64748b;">
+                        <h3>ไม่พบร้านอาหารที่ตรงกับคำค้นหา</h3>
+                        <a href="restaurants.html" style="color: #10b981; font-weight: bold; text-decoration: none; margin-top: 10px; display: inline-block;">ดูร้านอาหารทั้งหมด</a>
+                    </div>
+                `;
+            }
+        }
+    });
+</script>
 
 </body>
 </html>
