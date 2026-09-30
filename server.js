@@ -22,7 +22,7 @@ const orderRepo = new OrderRepository();
 const orderLiveLocations = {};
 
 // ----------------------------------------------------
-// ระบบเตรียมตารางฐานข้อมูลอัตโนมัติ (Auto Migration Guard)
+// ระบบเตรียมตารางฐานข้อมูลอัตโนมัติ (Auto Migration & Auto Seed Guard)
 // ----------------------------------------------------
 async function initializeDatabaseTables() {
   try {
@@ -132,7 +132,30 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    console.log('✅ [Database] โครงสร้างตารางทั้งหมดพร้อมใช้งานสมบูรณ์');
+    // --- AUTO-SEED เมนูอาหาร 13 รายการ (แยก Pizza และ Burger ชัดเจน 100%) ---
+    await pool.query(`
+      INSERT INTO foods (id, restaurant_id, name, price, image) VALUES 
+      (1, 1, 'ข้าวกะเพราหมูสับ', 50.00, 'Image/kapao-moosub.jpg'),
+      (2, 1, 'ข้าวกะเพราไก่', 50.00, 'Image/kapao-kai.jpg'),
+      (3, 1, 'ข้าวกะเพราเนื้อ', 70.00, 'Image/kapao-nuea.jpg'),
+      (4, 1, 'ไข่ดาว', 10.00, 'Image/fried-egg.jpg'),
+      (5, 2, 'Pizza Margherita', 199.00, 'Image/pizzamargherita.jpg'),
+      (6, 2, 'Pizza Hawaiian', 229.00, 'Image/pizzahawaiian.jpg'),
+      (7, 2, 'Pepperoni Pizza', 249.00, 'Image/pepperoni pizza.jpg'),
+      (8, 3, 'Classic Burger', 129.00, 'Image/classic burger.jpg'),
+      (9, 3, 'Cheese Burger', 149.00, 'Image/burgercheese.jpg'),
+      (10, 3, 'Chicken Burger', 139.00, 'Image/chicken burger.jpg'),
+      (11, 4, 'ก๋วยเตี๋ยวเรือหมูน้ำตก', 45.00, 'Image/noodle-pork.jpg'),
+      (12, 4, 'ก๋วยเตี๋ยวเรือเนื้อน้ำตก', 55.00, 'Image/noodle-beef.jpg'),
+      (13, 4, 'กากหมูเจียวกรอบ', 20.00, 'Image/pork-crackling.jpg')
+      ON DUPLICATE KEY UPDATE 
+        restaurant_id = VALUES(restaurant_id),
+        name = VALUES(name),
+        price = VALUES(price),
+        image = VALUES(image);
+    `);
+
+    console.log('✅ [Database] โครงสร้างตารางและเมนูอาหารทั้งหมดพร้อมใช้งานสมบูรณ์');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
@@ -145,7 +168,6 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
 
   try {
-    // 1. ดึงข้อมูลออเดอร์พร้อมข้อมูลร้านค้า
     const [orders] = await pool.query(
       `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id 
        FROM orders o
@@ -163,7 +185,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     const gpFee = foodAmount * 0.15; // GP 15%
     const merchantNet = Number((foodAmount - gpFee).toFixed(2));
 
-    // 2. โอนเงินให้ร้านค้า
+    // โอนเงินให้ร้านค้า
     let merchantUserId = order.owner_id;
     if (!merchantUserId) {
       const [defaultOwner] = await pool.query('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
@@ -185,7 +207,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
       console.log(`💰 [Payout Shop] ร้านค้า (User #${merchantUserId}) ได้รับ ฿${merchantNet}`);
     }
 
-    // 3. โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
+    // โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
     let riderUserId = explicitRiderId || order.rider_id;
     if (!riderUserId) {
       const [riderCheck] = await pool.query('SELECT id FROM users WHERE role = "rider" ORDER BY id ASC LIMIT 1');
@@ -325,7 +347,7 @@ app.patch('/api/restaurants/:id', async (req, res) => {
 
 app.get('/api/restaurants/:id/foods', (req, res) => foodController.getFoodsByRestaurant(req, res));
 
-// 3. เส้นทางตะกร้าสินค้า (Cart) - ใช้ LEFT JOIN และ Fallback เพื่อไม่ให้เบอร์เกอร์หรือเมนูใดตกหล่น
+// 3. เส้นทางตะกร้าสินค้า (Cart) - ซิงค์ร้านค้าและรายการอาหารตรงกัน 100%
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -465,7 +487,7 @@ app.post('/api/orders', async (req, res) => {
     const paymentMethod = payload.payment_method;
     const items = Array.isArray(payload.items) ? payload.items : [];
 
-    // ตรวจสอบ restaurant_id ที่แท้จริงจากอาหารชิ้นแรกเสมอ เพื่อป้องกันออเดอร์เด้งไปร้านผิด
+    // ตรวจสอบ restaurant_id ที่แท้จริงจากอาหารชิ้นแรกเสมอ ป้องกันออเดอร์เด้งไปร้านผิด
     if (items.length > 0) {
       const firstFoodId = items[0].food_id || items[0].id;
       if (firstFoodId) {
@@ -509,7 +531,7 @@ app.post('/api/orders', async (req, res) => {
     if (paymentMethod === 'wallet') {
       const [wallets] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [userId]);
       if (wallets.length > 0) {
-        await conn.query(
+        await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'order_payment', ?)`,
           [wallets[0].id, orderId, -amount, `ชำระค่าอาหารคำสั่งซื้อ #${orderId}`]
@@ -705,7 +727,6 @@ app.patch('/api/orders/:id/status', async (req, res) => {
       await pool.query('UPDATE orders SET status = ? WHERE id = ?', [cleanStatus, orderId]);
     }
 
-    // รองรับสถานะจบงานทั้งภาษาอังกฤษและภาษาไทย
     const isCompleted = [
       'completed', 'delivered', 'success', 'done', 
       'จัดส่งสำเร็จ', 'ส่งถึงมือลูกค้าแล้ว'
@@ -764,7 +785,7 @@ const handleWalletFetch = async (req, res) => {
 app.get('/api/wallet/:userId', handleWalletFetch);
 app.get('/wallet/:userId', handleWalletFetch);
 
-// เติมเงินเข้ากระเป๋าลูกค้า (Customer Top-up)
+// เติมเงินเข้ากระเป๋าลูกค้า
 const handleWalletTopup = async (req, res) => {
   const pool = db.getPool();
   try {
