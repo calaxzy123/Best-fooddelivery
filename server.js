@@ -115,8 +115,7 @@ async function initializeDatabaseTables() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL UNIQUE,
         balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
@@ -129,41 +128,25 @@ async function initializeDatabaseTables() {
         amount DECIMAL(10, 2) NOT NULL,
         type VARCHAR(50) NOT NULL,
         description VARCHAR(255) DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE CASCADE,
-        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
     console.log('✅ [Database] โครงสร้างตารางทั้งหมดพร้อมใช้งานสมบูรณ์');
   } catch (err) {
-    console.error('⚠️ [Database Init Notice]:', err.message);
+    console.error('⚠️️ [Database Init Notice]:', err.message);
   }
 }
 
 // ----------------------------------------------------
 // ฟังก์ชันจัดสรรเงินเข้ากระเป๋าร้านค้าและไรเดอร์ (Payout Guard)
 // ----------------------------------------------------
-async function processOrderPayout(orderId) {
+async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
-  let conn;
 
   try {
-    conn = await pool.getConnection();
-
-    // 1. ป้องกันการจ่ายเงินซ้ำ (Idempotency Check)
-    const [alreadyPaid] = await conn.query(
-      'SELECT id FROM wallet_transactions WHERE order_id = ? AND type = "order_earning" LIMIT 1',
-      [orderId]
-    );
-
-    if (alreadyPaid.length > 0) {
-      console.log(`[Payout Skipped] คำสั่งซื้อ #${orderId} เคยผ่านการจัดสรรเงินแล้ว`);
-      return;
-    }
-
-    // 2. ดึงข้อมูลออเดอร์และเจ้าของร้าน (ใช้ LEFT JOIN เพื่อไม่ให้ออเดอร์หลุด)
-    const [orders] = await conn.query(
+    // 1. ดึงข้อมูลออเดอร์พร้อมข้อมูลร้านค้า
+    const [orders] = await pool.query(
       `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id 
        FROM orders o
        LEFT JOIN restaurants r ON o.restaurant_id = r.id
@@ -177,64 +160,57 @@ async function processOrderPayout(orderId) {
     const deliveryFee = 20.00;
     const totalAmount = Number(order.total_amount) || 0;
     const foodAmount = Math.max(0, totalAmount - deliveryFee);
-    const gpPercent = 0.15; // GP 15%
-    const gpFee = foodAmount * gpPercent;
+    const gpFee = foodAmount * 0.15; // GP 15%
     const merchantNet = Number((foodAmount - gpFee).toFixed(2));
 
-    await conn.beginTransaction();
-
-    // 3. จัดสรรเงินให้ร้านค้า (หากไม่มี owner_id ให้ fallback ไปที่เจ้าของร้านคนแรก)
-    let merchantOwnerId = order.owner_id;
-    if (!merchantOwnerId) {
-      const [defaultOwner] = await conn.query('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
-      merchantOwnerId = (defaultOwner.length > 0 && defaultOwner[0].owner_id) ? defaultOwner[0].owner_id : 1;
+    // 2. โอนเงินให้ร้านค้า
+    let merchantUserId = order.owner_id;
+    if (!merchantUserId) {
+      const [defaultOwner] = await pool.query('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
+      merchantUserId = (defaultOwner.length > 0 && defaultOwner[0].owner_id) ? defaultOwner[0].owner_id : order.restaurant_id;
     }
 
-    if (merchantOwnerId) {
-      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [merchantOwnerId]);
-      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, merchantOwnerId]);
+    if (merchantUserId && merchantNet > 0) {
+      await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [merchantUserId]);
+      await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, merchantUserId]);
 
-      const [w] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [merchantOwnerId]);
+      const [w] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [merchantUserId]);
       if (w.length > 0) {
-        await conn.query(
+        await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'order_earning', ?)`,
           [w[0].id, order.id, merchantNet, `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${foodAmount} หัก GP 15%)`]
         );
       }
+      console.log(`💰 [Payout Shop] ร้านค้า (User #${merchantUserId}) ได้รับ ฿${merchantNet}`);
     }
 
-    // 4. จัดสรรเงินค่ารอบให้ไรเดอร์ (20 บาท)
-    let riderUserId = order.rider_id;
+    // 3. โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
+    let riderUserId = explicitRiderId || order.rider_id;
     if (!riderUserId) {
-      // fallback ดึงไรเดอร์คนล่าสุดที่รับงานนี้หากมี
-      const [riderCheck] = await conn.query('SELECT rider_id FROM orders WHERE id = ?', [order.id]);
-      if (riderCheck.length > 0 && riderCheck[0].rider_id) {
-        riderUserId = riderCheck[0].rider_id;
-      }
+      const [riderCheck] = await pool.query('SELECT id FROM users WHERE role = "rider" ORDER BY id ASC LIMIT 1');
+      riderUserId = riderCheck.length > 0 ? riderCheck[0].id : 5;
     }
 
     if (riderUserId) {
-      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [riderUserId]);
-      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [deliveryFee, riderUserId]);
+      await pool.query('UPDATE orders SET rider_id = ? WHERE id = ?', [riderUserId, order.id]);
+      await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [riderUserId]);
+      await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [deliveryFee, riderUserId]);
 
-      const [rw] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [riderUserId]);
+      const [rw] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [riderUserId]);
       if (rw.length > 0) {
-        await conn.query(
+        await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'delivery_fee', ?)`,
           [rw[0].id, order.id, deliveryFee, `ค่ารอบจัดส่งคำสั่งซื้อ #${order.id}`]
         );
       }
+      console.log(`🛵 [Payout Rider] ไรเดอร์ (User #${riderUserId}) ได้รับค่าจัดส่ง ฿${deliveryFee}`);
     }
 
-    await conn.commit();
-    console.log(`✅ [Payout Success] ออเดอร์ #${orderId}: ร้านค้า (ID: ${merchantOwnerId}) +${merchantNet} บ., ไรเดอร์ (ID: ${riderUserId || 'ไม่มี'}) +${deliveryFee} บ.`);
+    console.log(`✅ [Payout Complete] คำสั่งซื้อ #${orderId} จัดสรรเงินเรียบร้อย`);
   } catch (error) {
-    if (conn) await conn.rollback();
-    console.error('Order Payout Processing Error (Non-Fatal):', error.message);
-  } finally {
-    if (conn) conn.release();
+    console.error('Order Payout Processing Error:', error.message);
   }
 }
 
@@ -349,7 +325,7 @@ app.patch('/api/restaurants/:id', async (req, res) => {
 
 app.get('/api/restaurants/:id/foods', (req, res) => foodController.getFoodsByRestaurant(req, res));
 
-// 3. เส้นทางตะกร้าสินค้า (Cart) - ปรับปรุง INNER JOIN และตัดค่า NULL
+// 3. เส้นทางตะกร้าสินค้า (Cart)
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -452,10 +428,21 @@ app.post('/api/orders', async (req, res) => {
     const payload = { ...req.body };
     const userId = Number(payload.user_id || payload.userId);
     const paymentMethod = payload.payment_method;
+    const items = Array.isArray(payload.items) ? payload.items : [];
+
+    // ตรวจสอบ restaurant_id ที่แท้จริงจากอาหารชิ้นแรกเสมอ เพื่อป้องกันออเดอร์เด้งไปร้านผิด
+    if (items.length > 0) {
+      const firstFoodId = items[0].food_id || items[0].id;
+      if (firstFoodId) {
+        const [foodRow] = await pool.query('SELECT restaurant_id FROM foods WHERE id = ?', [firstFoodId]);
+        if (foodRow.length > 0 && foodRow[0].restaurant_id) {
+          payload.restaurant_id = foodRow[0].restaurant_id;
+        }
+      }
+    }
 
     let amount = Number(payload.total_amount);
     if (isNaN(amount) || amount <= 0) {
-      const items = Array.isArray(payload.items) ? payload.items : [];
       const subtotal = items.reduce((sum, it) => {
         const p = Number(it.price || it.food_price || 0);
         const q = Number(it.quantity || it.qty || 1);
@@ -496,7 +483,6 @@ app.post('/api/orders', async (req, res) => {
     }
 
     await conn.query('DELETE FROM carts WHERE user_id = ?', [userId]);
-
     await conn.commit();
 
     res.json({
@@ -529,30 +515,40 @@ app.get('/api/users/:userId/orders', async (req, res) => {
   }
 });
 
+// ระบบยกเลิกคำสั่งซื้อ (Order Cancellation)
 app.post('/api/orders/:id/cancel', async (req, res) => {
   const pool = db.getPool();
-  let conn;
-
   try {
     const orderId = req.params.id;
     const { userId } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: 'กรุณาระบุรหัสผู้ใช้งาน' });
+    const [orders] = await pool.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (orders.length === 0) {
+      return res.status(404).json({ success: false, message: 'ไม่พบออเดอร์นี้ในระบบ' });
     }
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
+    const order = orders[0];
+    if (['preparing', 'ready', 'delivering', 'completed', 'delivered'].includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่สามารถยกเลิกได้ เนื่องจากร้านค้าเริ่มปรุงอาหารหรือเริ่มจัดส่งแล้ว'
+      });
+    }
 
-    const [orders] = await conn.query('SELECT total_amount, payment_method, status FROM orders WHERE id = ?', [orderId]);
-    if (orders.length > 0 && orders[0].payment_method === 'wallet' && orders[0].status !== 'cancelled') {
-      const refundAmount = Number(orders[0].total_amount);
-      await conn.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [userId]);
-      await conn.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [refundAmount, userId]);
+    // ปรับสถานะเป็น cancelled
+    await pool.query('UPDATE orders SET status = "cancelled" WHERE id = ?', [orderId]);
 
-      const [w] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [userId]);
+    // คืนเงินหากชำระด้วย Wallet
+    if (order.payment_method === 'wallet' && order.status !== 'cancelled') {
+      const refundAmount = Number(order.total_amount) || 0;
+      const targetUid = userId || order.user_id;
+
+      await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [targetUid]);
+      await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [refundAmount, targetUid]);
+
+      const [w] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [targetUid]);
       if (w.length > 0) {
-        await conn.query(
+        await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'refund', ?)`,
           [w[0].id, orderId, refundAmount, `คืนเงินจากการยกเลิกคำสั่งซื้อ #${orderId}`]
@@ -560,19 +556,11 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
       }
     }
 
-    await orderRepo.cancelOrder(orderId, userId);
-    await conn.commit();
-
+    delete orderLiveLocations[orderId];
     res.json({ success: true, message: 'ยกเลิกคำสั่งซื้อและคืนเงินเข้ากระเป๋าเรียบร้อยแล้ว' });
   } catch (error) {
-    if (conn) await conn.rollback();
     console.error('Cancel Order Error:', error);
-    res.status(400).json({
-      success: false,
-      message: error.message || 'ไม่สามารถยกเลิกคำสั่งซื้อได้'
-    });
-  } finally {
-    if (conn) conn.release();
+    res.status(500).json({ success: false, message: error.message || 'ไม่สามารถยกเลิกคำสั่งซื้อได้' });
   }
 });
 
@@ -608,7 +596,6 @@ app.get('/api/rider/orders', async (req, res) => {
       FROM orders o
       JOIN users u ON o.user_id = u.id
       LEFT JOIN restaurants r ON o.restaurant_id = r.id
-      WHERE o.status IN ('ready', 'delivering', 'completed')
       ORDER BY o.created_at DESC
       LIMIT 30
     `);
@@ -663,7 +650,7 @@ app.get('/api/orders/:id/location', (req, res) => {
   res.json({ success: true, location: loc });
 });
 
-// 8. ปรับสถานะคำสั่งซื้อ & Payout Trigger (รองรับสถานะสำเร็จทุกรูปแบบ)
+// 8. ปรับสถานะคำสั่งซื้อ & Payout Trigger
 app.patch('/api/orders/:id/status', async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -674,27 +661,27 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     }
 
     const cleanStatus = String(status).trim().toLowerCase();
-    const finalRiderId = Number(rider_id || riderId);
+    const finalRiderId = Number(rider_id || riderId) || null;
     const pool = db.getPool();
 
-    // บันทึก rider_id เข้าตารางคำสั่งซื้อทันทีหากมีการส่งมา
-    if (finalRiderId > 0) {
-      try {
-        await pool.query('UPDATE orders SET rider_id = ? WHERE id = ?', [finalRiderId, orderId]);
-      } catch (err) {}
+    if (finalRiderId) {
+      await pool.query('UPDATE orders SET rider_id = ?, status = ? WHERE id = ?', [finalRiderId, cleanStatus, orderId]);
+    } else {
+      await pool.query('UPDATE orders SET status = ? WHERE id = ?', [cleanStatus, orderId]);
     }
 
-    await orderRepo.updateStatus(orderId, cleanStatus);
-
-    // รองรับสถานะจบงาน: completed, delivered, success, done
-    const isCompleted = ['completed', 'delivered', 'success', 'done'].includes(cleanStatus);
+    // รองรับสถานะจบงานทั้งภาษาอังกฤษและภาษาไทย
+    const isCompleted = [
+      'completed', 'delivered', 'success', 'done', 
+      'จัดส่งสำเร็จ', 'ส่งถึงมือลูกค้าแล้ว'
+    ].includes(cleanStatus);
 
     if (isCompleted || cleanStatus === 'cancelled') {
       delete orderLiveLocations[orderId];
     }
 
     if (isCompleted) {
-      await processOrderPayout(orderId);
+      await processOrderPayout(orderId, finalRiderId);
     }
 
     res.json({
@@ -801,7 +788,7 @@ const handleWalletWithdraw = async (req, res) => {
 
     const wallet = wallets[0];
     await conn.query('UPDATE wallets SET balance = balance - ? WHERE id = ?', [withdrawAmount, wallet.id]);
-    await conn.query(
+    await pool.query(
       `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
        VALUES (?, ?, 'withdraw', ?)`,
       [wallet.id, -withdrawAmount, `ถอนเงินเข้าบัญชีธนาคาร จำนวน ${withdrawAmount.toFixed(2)} บาท`]
@@ -821,14 +808,14 @@ const handleWalletWithdraw = async (req, res) => {
 app.post('/api/wallet/withdraw', handleWalletWithdraw);
 app.post('/wallet/withdraw', handleWalletWithdraw);
 
-// ชี้ตำแหน่งไฟล์หน้าเว็บ Static (รองรับโฟลเดอร์รูปภาพ Image/ และ images/)
+// ชี้ตำแหน่งไฟล์หน้าเว็บ Static
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, '../')));
 app.use('/Image', express.static(path.join(__dirname, '../Image')));
 app.use('/image', express.static(path.join(__dirname, '../Image')));
 app.use('/images', express.static(path.join(__dirname, '../Image')));
 
-// เส้นทางดักหน้าเว็บหลัก
+// เส้นทางหน้าหลัก
 app.get('/', (req, res) => {
   const localIndex = path.join(__dirname, 'index.html');
   const parentIndex = path.join(__dirname, '../index.html');
@@ -837,14 +824,13 @@ app.get('/', (req, res) => {
     if (err) {
       res.sendFile(parentIndex, (err2) => {
         if (err2) {
-          res.status(404).send('ไม่พบไฟล์ index.html กรุณาตรวจสอบตำแหน่งไฟล์');
+          res.status(404).send('ไม่พบไฟล์ index.html');
         }
       });
     }
   });
 });
 
-// ฟังก์ชันกลางสำหรับส่งไฟล์แบบยืดหยุ่น Case-Insensitive
 function sendHtmlFile(res, fileName1, fileName2) {
   res.sendFile(path.join(__dirname, fileName1), (err) => {
     if (err && fileName2) {
@@ -865,13 +851,10 @@ function sendHtmlFile(res, fileName1, fileName2) {
   });
 }
 
-// เส้นทางรองรับทั้งตัวพิมพ์เล็กและพิมพ์ใหญ่
 app.get('/login.html', (req, res) => sendHtmlFile(res, 'Login.html', 'login.html'));
 app.get('/Login.html', (req, res) => sendHtmlFile(res, 'Login.html', 'login.html'));
-
 app.get('/register.html', (req, res) => sendHtmlFile(res, 'Register.html', 'register.html'));
 app.get('/Register.html', (req, res) => sendHtmlFile(res, 'Register.html', 'register.html'));
-
 app.get('/cart.html', (req, res) => sendHtmlFile(res, 'cart.html'));
 app.get('/checkout.html', (req, res) => sendHtmlFile(res, 'checkout.html'));
 app.get('/order.html', (req, res) => sendHtmlFile(res, 'order.html'));
