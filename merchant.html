@@ -254,8 +254,8 @@
                 <div>
                     <label style="font-weight:bold; font-size:14px;">ร้านค้าของคุณ: </label>
                     <select id="restaurantSelect" class="select-store" onchange="onSelectStore()">
-                        <option value="2">Pizza House (ID: 2)</option>
                         <option value="1">ร้านกะเพราอร่อย (ID: 1)</option>
+                        <option value="2">Pizza House (ID: 2)</option>
                         <option value="3">Burger Station (ID: 3)</option>
                         <option value="4">ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)</option>
                     </select>
@@ -293,7 +293,9 @@
     </div>
 
     <script>
-        let currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        // รองรับทั้งคีย์ 'currentUser' และ 'user' จาก Login
+        let rawUser = localStorage.getItem('currentUser') || localStorage.getItem('user') || '{}';
+        let currentUser = JSON.parse(rawUser);
         const userRole = (currentUser.role || '').toLowerCase();
 
         if (!currentUser.id || (userRole !== 'restaurant' && userRole !== 'merchant' && userRole !== 'admin')) {
@@ -306,16 +308,8 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        function detectStoreId() {
-            if (currentUser.restaurant_id) return Number(currentUser.restaurant_id);
-            const text = ((currentUser.name || '') + ' ' + (currentUser.email || '')).toLowerCase();
-            if (text.includes('pizza') || text.includes('พิซซ่า')) return 2;
-            if (text.includes('burger') || text.includes('เบอร์เกอร์')) return 3;
-            if (text.includes('noodle') || text.includes('ก๋วยเตี๋ยว')) return 4;
-            return 1;
-        }
-
-        let currentStoreId = detectStoreId();
+        // กำหนด ID ร้านตาม restaurant_id หรือ id ของผู้ใช้โดยตรง
+        let currentStoreId = Number(currentUser.restaurant_id || currentUser.id || 1);
 
         async function initMerchant() {
             try {
@@ -325,6 +319,7 @@
                     if (uData.user && uData.user.restaurant_id) {
                         currentStoreId = Number(uData.user.restaurant_id);
                         currentUser.restaurant_id = currentStoreId;
+                        localStorage.setItem('user', JSON.stringify(currentUser));
                         localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     }
                 }
@@ -482,9 +477,10 @@
 
         // ฟังก์ชันระบบกระเป๋าเงิน (Wallet)
         async function loadWalletBalance() {
-            if (!currentUser.id) return;
+            const targetUserId = currentUser.id || currentUser.restaurant_id;
+            if (!targetUserId) return;
             try {
-                const res = await fetch('/api/wallet/' + currentUser.id + '?_t=' + Date.now(), { cache: 'no-store' });
+                const res = await fetch('/api/wallet/' + targetUserId + '?_t=' + Date.now(), { cache: 'no-store' });
                 const data = await res.json();
                 if (data.success) {
                     const balanceEl = document.getElementById('walletBalance');
@@ -522,10 +518,11 @@
             }
 
             try {
+                const targetUserId = currentUser.id || currentUser.restaurant_id;
                 const res = await fetch('/api/wallet/withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: Number(currentUser.id), amount: amount })
+                    body: JSON.stringify({ userId: Number(targetUserId), amount: amount })
                 });
                 const result = await res.json();
                 alert(result.message);
@@ -561,6 +558,7 @@
                     closeModal();
                     currentStoreId = data.restaurantId;
                     currentUser.restaurant_id = currentStoreId;
+                    localStorage.setItem('user', JSON.stringify(currentUser));
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     await loadStoreDropdown();
                 } else {
