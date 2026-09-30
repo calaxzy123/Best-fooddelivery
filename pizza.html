@@ -1,15 +1,12 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pizza House - เมนู</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-
 <body>
-
 <header class="main-header">
     <div class="header-container">
         <h1 class="logo">🍴 BestFood Delivery</h1>
@@ -22,63 +19,69 @@
         </nav>
     </div>
 </header>
-
 <main>
     <h2>🍕 Pizza House</h2>
-    <p>พิซซ่าอบสดใหม่จากเตา</p>
-
+    <p>พิซซ่าเตาถ่าน แป้งหนานุ่ม ชีสเยิ้ม</p>
     <section class="food-grid">
-        <!-- Pepperoni Pizza (ใช้ food_id = 4 ตรงตาม MySQL) -->
-        <article class="food-card">
-            <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
-            <div class="food-info">
-                <h3>Pepperoni Pizza</h3>
-                <p>พิซซ่าเปปเปอโรนีและชีส</p>
-                <strong>179 บาท</strong>
-                <button type="button" onclick="addToCart('Pepperoni Pizza', 249, 'Image/pepperoni pizza.jpg', 2, 10)">เพิ่มลงตะกร้า</button>
-            </div>
-        </article>
-
-        <!-- Pizza Margherita (ใช้ food_id = 5 ตรงตาม MySQL) -->
         <article class="food-card">
             <img src="Image/pizzamargherita.jpg" alt="Pizza Margherita" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Pizza Margherita</h3>
-                <p>พิซซ่าซอสมะเขือเทศ ชีส และใบโหระพา</p>
-                <strong>159 บาท</strong>
-                <button type="button" onclick="addToCart('Pizza Margherita', 199, 'Image/pizzamargherita.jpg', 2, 8)">เพิ่มลงตะกร้า</button>
+                <p>พิซซ่าหน้าชีสและซอสมะเขือเทศคลาสสิก</p>
+                <strong>199 บาท</strong>
+                <button type="button" onclick="handleAddToCart('Pizza Margherita', 199, 'Image/pizzamargherita.jpg', 2, 5)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
-
-        <!-- Hawaiian Pizza (ใช้ food_id = 6 ตรงตาม MySQL) -->
         <article class="food-card">
-            <img src="Image/pizzahawaiian.jpg" alt="Hawaiian Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <img src="Image/pizzahawaiian.jpg" alt="Pizza Hawaiian" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
-                <h3>Hawaiian Pizza</h3>
-                <p>แฮม สับปะรด และชีส</p>
-                <strong>189 บาท</strong>
-                <button type="button" onclick="addToCart('Pizza Hawaiian', 229, 'Image/pizzahawaiian.jpg', 2, 9)">เพิ่มลงตะกร้า</button>
+                <h3>Pizza Hawaiian</h3>
+                <p>พิซซ่าหน้าแฮมและสับปะรดยอดนิยม</p>
+                <strong>229 บาท</strong>
+                <button type="button" onclick="handleAddToCart('Pizza Hawaiian', 229, 'Image/pizzahawaiian.jpg', 2, 6)">เพิ่มลงตะกร้า</button>
+            </div>
+        </article>
+        <article class="food-card">
+            <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+            <div class="food-info">
+                <h3>Pepperoni Pizza</h3>
+                <p>พิซซ่าหน้าเปปเปอโรนีเนื้อแน่น</p>
+                <strong>249 บาท</strong>
+                <button type="button" onclick="handleAddToCart('Pepperoni Pizza', 249, 'Image/pepperoni pizza.jpg', 2, 7)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
     </section>
 </main>
-
-<footer>
-    <p>© 2026 Food Delivery</p>
-</footer>
-
+<footer><p>© 2026 Food Delivery</p></footer>
 <script src="script.js"></script>
 <script>
-    // อัปเดตสถานะล็อกอินและตะกร้าเบื้องต้นเมื่อเปิดหน้า
-    document.addEventListener("DOMContentLoaded", () => {
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const authNav = document.getElementById("authNav");
-        if (currentUser.id && authNav) {
-            authNav.textContent = `👤 ${currentUser.name || 'โปรไฟล์'}`;
-            authNav.href = currentUser.role === 'restaurant' ? 'merchant.html' : (currentUser.role === 'rider' ? 'rider.html' : 'order.html');
+async function handleAddToCart(name, price, image, restaurantId, foodId) {
+    const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+    const currentUser = rawUser ? JSON.parse(rawUser) : null;
+    const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+    if (!userId) {
+        alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
+        window.location.href = "login.html";
+        return;
+    }
+    try {
+        const res = await fetch("/api/cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: Number(userId), user_id: Number(userId), foodId: Number(foodId), food_id: Number(foodId), restaurantId: Number(restaurantId), restaurant_id: Number(restaurantId), quantity: 1 })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert('✅ เพิ่ม "' + name + '" ลงในตะกร้าเรียบร้อยแล้ว!');
+            const countEl = document.getElementById("cart-count");
+            if (countEl) countEl.textContent = Number(countEl.textContent || 0) + 1;
+        } else {
+            alert(data.message || "เพิ่มลงในตะกร้าไม่สำเร็จ");
         }
-    });
+    } catch(err) {
+        console.error(err);
+    }
+}
 </script>
-
 </body>
 </html>
