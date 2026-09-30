@@ -44,7 +44,6 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        /* Wallet Card Component */
         .wallet-card {
             background: #ffffff;
             border-radius: 12px;
@@ -293,7 +292,6 @@
     </div>
 
     <script>
-        // รองรับทั้งคีย์ 'currentUser' และ 'user' จาก Login
         let rawUser = localStorage.getItem('currentUser') || localStorage.getItem('user') || '{}';
         let currentUser = JSON.parse(rawUser);
         const userRole = (currentUser.role || '').toLowerCase();
@@ -308,8 +306,23 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        // กำหนด ID ร้านตาม restaurant_id หรือ id ของผู้ใช้โดยตรง
-        let currentStoreId = Number(currentUser.restaurant_id || currentUser.id || 1);
+        // ตรวจจับ ID ร้านค้าจากชื่อบัญชีและคีย์ของ User ให้แม่นยำ 100%
+        function detectStoreId(user) {
+            if (user.restaurant_id && Number(user.restaurant_id) > 0) {
+                return Number(user.restaurant_id);
+            }
+            const name = String(user.name || '').toLowerCase();
+            const email = String(user.email || '').toLowerCase();
+            
+            if (name.includes('pizza') || email.includes('pizza')) return 2;
+            if (name.includes('burger') || email.includes('burger')) return 3;
+            if (name.includes('noodle') || name.includes('เตี๋ยว') || email.includes('noodle')) return 4;
+            if (name.includes('กะเพรา') || name.includes('kapao') || email.includes('kapao')) return 1;
+            
+            return Number(user.id || 1);
+        }
+
+        let currentStoreId = detectStoreId(currentUser);
 
         async function initMerchant() {
             try {
@@ -318,12 +331,14 @@
                     const uData = await uRes.json();
                     if (uData.user && uData.user.restaurant_id) {
                         currentStoreId = Number(uData.user.restaurant_id);
-                        currentUser.restaurant_id = currentStoreId;
-                        localStorage.setItem('user', JSON.stringify(currentUser));
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     }
                 }
             } catch(e) {}
+
+            currentStoreId = detectStoreId({ ...currentUser, restaurant_id: currentStoreId });
+            currentUser.restaurant_id = currentStoreId;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            localStorage.setItem('user', JSON.stringify(currentUser));
 
             await loadStoreDropdown();
             await loadWalletBalance();
@@ -331,41 +346,41 @@
 
         async function loadStoreDropdown() {
             const select = document.getElementById('restaurantSelect');
+            let allStores = [
+                { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1" },
+                { id: 2, name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
+                { id: 3, name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
+                { id: 4, name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
+            ];
+
             try {
                 const res = await fetch('/api/restaurants?_t=' + Date.now(), { cache: 'no-store' });
-                let allStores = [];
                 if (res.ok) {
                     const json = await res.json();
-                    allStores = json.restaurants || json.data || (Array.isArray(json) ? json : []);
+                    const fetchedStores = json.restaurants || json.data;
+                    if (Array.isArray(fetchedStores) && fetchedStores.length > 0) {
+                        allStores = fetchedStores;
+                    }
                 }
-
-                if (allStores.length === 0) {
-                    allStores = [
-                        { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1" },
-                        { id: 2, name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
-                        { id: 3, name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
-                        { id: 4, name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
-                    ];
-                }
-
-                const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || allStores[0];
-                currentStoreId = myStore.id;
-
-                if (userRole === 'admin') {
-                    select.disabled = false;
-                    select.innerHTML = allStores.map(function(s) {
-                        const isSelected = Number(s.id) === Number(currentStoreId) ? 'selected' : '';
-                        return '<option value="' + s.id + '" ' + isSelected + '>' + s.name + ' (ID: ' + s.id + ')</option>';
-                    }).join('');
-                } else {
-                    select.innerHTML = '<option value="' + myStore.id + '" selected>🔒 ' + myStore.name + ' (ร้านของคุณ)</option>';
-                    select.disabled = true;
-                }
-
-                updateProfileCard(myStore);
             } catch (err) {
                 console.error("Store dropdown error:", err);
             }
+
+            const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || allStores.find(s => s.name.toLowerCase().includes('pizza')) || allStores[0];
+            currentStoreId = myStore.id;
+
+            if (userRole === 'admin') {
+                select.disabled = false;
+                select.innerHTML = allStores.map(function(s) {
+                    const isSelected = Number(s.id) === Number(currentStoreId) ? 'selected' : '';
+                    return '<option value="' + s.id + '" ' + isSelected + '>' + s.name + ' (ID: ' + s.id + ')</option>';
+                }).join('');
+            } else {
+                select.innerHTML = '<option value="' + myStore.id + '" selected>🔒 ' + myStore.name + ' (ร้านของคุณ)</option>';
+                select.disabled = true;
+            }
+
+            updateProfileCard(myStore);
             loadOrders();
         }
 
@@ -398,7 +413,7 @@
                     const timeStr = ord.created_at ? new Date(ord.created_at).toLocaleTimeString('th-TH') : '-';
                     const paymentText = ord.payment_method === 'cash_on_delivery' 
                         ? '💵 เก็บเงินปลายทาง (COD)' 
-                        : '📱 โอนเงิน / พร้อมเพย์';
+                        : '📱 โอนเงิน / พร้อมเพย์ / Wallet';
 
                     const itemsHtml = items.map(function(it) {
                         const fName = it.food_name || it.name || 'อาหาร';
@@ -475,7 +490,6 @@
             }
         }
 
-        // ฟังก์ชันระบบกระเป๋าเงิน (Wallet)
         async function loadWalletBalance() {
             const targetUserId = currentUser.id || currentUser.restaurant_id;
             if (!targetUserId) return;

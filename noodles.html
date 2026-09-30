@@ -21,8 +21,9 @@
 </header>
 <main>
     <h2>🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย</h2>
-    <p>ก๋วยเตี๋ยวน้ำตกเข้มข้น จัดจ้านถึงใจ</p>
+    <p>ก๋วยเตี๋ยวน้ำตกเข้มข้น รสเด็ดจัดจ้านถึงใจ</p>
     <section class="food-grid">
+        <!-- ก๋วยเตี๋ยวต้มยำ (food_id = 11, restaurant_id = 4) -->
         <article class="food-card">
             <img src="Image/noodle-tomyum.jpg" alt="ก๋วยเตี๋ยวต้มยำ" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
@@ -32,15 +33,19 @@
                 <button type="button" onclick="handleAddToCart('ก๋วยเตี๋ยวต้มยำ', 50, 'Image/noodle-tomyum.jpg', 4, 11)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
+
+        <!-- ก๋วยเตี๋ยวหมู (food_id = 12, restaurant_id = 4) -->
         <article class="food-card">
             <img src="Image/noodle-pork.jpg" alt="ก๋วยเตี๋ยวหมู" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>ก๋วยเตี๋ยวหมู</h3>
-                <p>ก๋วยเตี๋ยวหมูน้ำตกเข้มข้น</p>
+                <p>ก๋วยเตี๋ยวหมูน้ำตกเข้มข้น เนื้อหมูนุ่ม</p>
                 <strong>45 บาท</strong>
                 <button type="button" onclick="handleAddToCart('ก๋วยเตี๋ยวหมู', 45, 'Image/noodle-pork.jpg', 4, 12)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
+
+        <!-- ก๋วยเตี๋ยวเนื้อ (food_id = 13, restaurant_id = 4) -->
         <article class="food-card">
             <img src="Image/noodle-beef.jpg" alt="ก๋วยเตี๋ยวเนื้อ" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
@@ -59,27 +64,47 @@ async function handleAddToCart(name, price, image, restaurantId, foodId) {
     const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
     const currentUser = rawUser ? JSON.parse(rawUser) : null;
     const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+    
     if (!userId) {
         alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
         window.location.href = "login.html";
         return;
     }
+    
     try {
         const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: Number(userId), user_id: Number(userId), foodId: Number(foodId), food_id: Number(foodId), restaurantId: Number(restaurantId), restaurant_id: Number(restaurantId), quantity: 1 })
+            body: JSON.stringify({ 
+                userId: Number(userId), 
+                user_id: Number(userId), 
+                foodId: Number(foodId), 
+                food_id: Number(foodId), 
+                restaurantId: Number(restaurantId), 
+                restaurant_id: Number(restaurantId), 
+                quantity: 1 
+            })
         });
+        
         const data = await res.json();
         if (res.ok && data.success) {
             alert('✅ เพิ่ม "' + name + '" ลงในตะกร้าเรียบร้อยแล้ว!');
-            const countEl = document.getElementById("cart-count");
-            if (countEl) countEl.textContent = Number(countEl.textContent || 0) + 1;
+            
+            // ดึงจำนวนตะกร้าจริงมาอัปเดตทันที
+            try {
+                const cRes = await fetch(`/api/cart/${userId}?_t=${Date.now()}`);
+                const cData = await cRes.json();
+                const items = cData.data || cData.items || [];
+                const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+                const countEl = document.getElementById("cart-count");
+                if (countEl) countEl.textContent = totalQty;
+            } catch(e) {}
         } else {
             alert(data.message || "เพิ่มลงในตะกร้าไม่สำเร็จ");
         }
     } catch(err) {
         console.error(err);
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     }
 }
 </script>
