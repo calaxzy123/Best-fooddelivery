@@ -23,6 +23,7 @@
     <h2>🍕 Pizza House</h2>
     <p>พิซซ่าเตาถ่าน แป้งหนานุ่ม ชีสเยิ้ม</p>
     <section class="food-grid">
+        <!-- Pizza Margherita (food_id = 5, restaurant_id = 2) -->
         <article class="food-card">
             <img src="Image/pizzamargherita.jpg" alt="Pizza Margherita" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
@@ -32,6 +33,8 @@
                 <button type="button" onclick="handleAddToCart('Pizza Margherita', 199, 'Image/pizzamargherita.jpg', 2, 5)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
+
+        <!-- Pizza Hawaiian (food_id = 6, restaurant_id = 2) -->
         <article class="food-card">
             <img src="Image/pizzahawaiian.jpg" alt="Pizza Hawaiian" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
@@ -41,6 +44,8 @@
                 <button type="button" onclick="handleAddToCart('Pizza Hawaiian', 229, 'Image/pizzahawaiian.jpg', 2, 6)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
+
+        <!-- Pepperoni Pizza (food_id = 7, restaurant_id = 2) -->
         <article class="food-card">
             <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
@@ -55,33 +60,66 @@
 <footer><p>© 2026 Food Delivery</p></footer>
 <script src="script.js"></script>
 <script>
+async function updateHeaderCartCount(userId) {
+    if (!userId) return;
+    try {
+        const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
+        const data = await res.json();
+        const items = data.data || data.items || [];
+        const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+        const countEl = document.getElementById("cart-count");
+        if (countEl) countEl.textContent = totalQty;
+    } catch (err) {
+        console.error("Cart count update error:", err);
+    }
+}
+
 async function handleAddToCart(name, price, image, restaurantId, foodId) {
     const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
     const currentUser = rawUser ? JSON.parse(rawUser) : null;
     const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+    
     if (!userId) {
         alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
         window.location.href = "login.html";
         return;
     }
+    
     try {
         const res = await fetch("/api/cart", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: Number(userId), user_id: Number(userId), foodId: Number(foodId), food_id: Number(foodId), restaurantId: Number(restaurantId), restaurant_id: Number(restaurantId), quantity: 1 })
+            body: JSON.stringify({
+                userId: Number(userId),
+                user_id: Number(userId),
+                foodId: Number(foodId),
+                food_id: Number(foodId),
+                restaurantId: Number(restaurantId),
+                restaurant_id: Number(restaurantId),
+                quantity: 1
+            })
         });
         const data = await res.json();
         if (res.ok && data.success) {
             alert('✅ เพิ่ม "' + name + '" ลงในตะกร้าเรียบร้อยแล้ว!');
-            const countEl = document.getElementById("cart-count");
-            if (countEl) countEl.textContent = Number(countEl.textContent || 0) + 1;
+            await updateHeaderCartCount(userId);
         } else {
             alert(data.message || "เพิ่มลงในตะกร้าไม่สำเร็จ");
         }
     } catch(err) {
-        console.error(err);
+        console.error("Cart error:", err);
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+    const currentUser = rawUser ? JSON.parse(rawUser) : null;
+    const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+    if (userId) {
+        updateHeaderCartCount(userId);
+    }
+});
 </script>
 </body>
 </html>

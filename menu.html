@@ -44,6 +44,22 @@
 <script src="script.js"></script>
 
 <script>
+    const fallbackMenuCatalog = {
+        1: { name: "ข้าวกะเพราหมูสับ", price: 50, image: "Image/kapao-moosub.jpg" },
+        2: { name: "ข้าวกะเพราไก่", price: 50, image: "Image/kapao-kai.jpg" },
+        3: { name: "ข้าวกะเพราเนื้อ", price: 70, image: "Image/kapao-nae.jpg" },
+        4: { name: "ไข่ดาว", price: 10, image: "Image/dao.jpg" },
+        5: { name: "Pizza Margherita", price: 199, image: "Image/pizzamargherita.jpg" },
+        6: { name: "Pizza Hawaiian", price: 229, image: "Image/pizzahawaiian.jpg" },
+        7: { name: "Pepperoni Pizza", price: 249, image: "Image/pepperoni pizza.jpg" },
+        8: { name: "Classic Burger", price: 129, image: "Image/classic burger.jpg" },
+        9: { name: "Cheese Burger", price: 149, image: "Image/burgercheese.jpg" },
+        10: { name: "Chicken Burger", price: 139, image: "Image/chicken burger.jpg" },
+        11: { name: "ก๋วยเตี๋ยวต้มยำ", price: 50, image: "Image/noodle-tomyum.jpg" },
+        12: { name: "ก๋วยเตี๋ยวหมู", price: 45, image: "Image/noodle-pork.jpg" },
+        13: { name: "ก๋วยเตี๋ยวเนื้อ", price: 60, image: "Image/noodle-beef.jpg" }
+    };
+
     const urlParams = new URLSearchParams(window.location.search);
     const restaurantId = parseInt(urlParams.get("restaurantId")) || 1;
 
@@ -59,7 +75,13 @@
     document.getElementById("storeDesc").innerText = currentStore.desc;
     document.title = `${currentStore.title} - BestFood Delivery`;
 
-    function formatFoodImage(imagePath) {
+    function formatFoodImage(imagePath, foodId) {
+        if (foodId && fallbackMenuCatalog[foodId]) {
+            const fallbackImg = fallbackMenuCatalog[foodId].image;
+            if (!imagePath || imagePath.includes('logoweb.png') || imagePath.includes('fried-egg') || imagePath.includes('kapao-nuea')) {
+                return fallbackImg;
+            }
+        }
         if (!imagePath) return "Image/logoweb.png";
         imagePath = String(imagePath).trim();
         if (imagePath.startsWith("http://") || imagePath.startsWith("https://") || imagePath.startsWith("Image/") || imagePath.startsWith("image/")) {
@@ -68,29 +90,97 @@
         return "Image/" + imagePath;
     }
 
+    async function updateHeaderCartCount(userId) {
+        if (!userId) return;
+        try {
+            const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
+            const data = await res.json();
+            const items = data.data || data.items || [];
+            const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+            const badge = document.getElementById("cart-count");
+            if (badge) badge.textContent = totalQty;
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function handleDirectAddToCart(name, price, image, rId, fId) {
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : null;
+        const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+
+        if (!userId) {
+            alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
+            window.location.href = "login.html";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: Number(userId),
+                    user_id: Number(userId),
+                    foodId: Number(fId),
+                    food_id: Number(fId),
+                    restaurantId: Number(rId),
+                    restaurant_id: Number(rId),
+                    quantity: 1
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(`✅ เพิ่ม "${name}" ลงในตะกร้าเรียบร้อยแล้ว!`);
+                await updateHeaderCartCount(userId);
+            } else {
+                alert(data.message || "เพิ่มลงในตะกร้าไม่สำเร็จ");
+            }
+        } catch (err) {
+            console.error("Cart error:", err);
+            alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+        }
+    }
+
     fetch(`/api/restaurants/${restaurantId}/foods?_t=${Date.now()}`, { cache: "no-store" })
         .then(response => response.json())
         .then(result => {
             const foodList = document.getElementById("food-list");
-            const foods = result.data || result.foods || [];
+            let foods = result.data || result.foods || [];
 
-            if (!result.success || foods.length === 0) {
+            // Fallback รายการอาหารของร้านกะเพราหากฐานข้อมูลยังไม่ส่งค่ากลับมา
+            if (foods.length === 0 && restaurantId === 1) {
+                foods = [
+                    { id: 1, name: "ข้าวกะเพราหมูสับ", price: 50.00, image: "Image/kapao-moosub.jpg", description: "กะเพราหมูสับรสเข้มข้น" },
+                    { id: 2, name: "ข้าวกะเพราไก่", price: 50.00, image: "Image/kapao-kai.jpg", description: "กะเพราไก่เนื้อแน่นนุ่ม" },
+                    { id: 3, name: "ข้าวกะเพราเนื้อ", price: 70.00, image: "Image/kapao-nae.jpg", description: "กะเพราเนื้อหอมกรุ่นจัดจ้าน" },
+                    { id: 4, name: "ไข่ดาว", price: 10.00, image: "Image/dao.jpg", description: "ไข่ดาวกรอบนอกไข่แดงเยิ้ม" }
+                ];
+            }
+
+            if (foods.length === 0) {
                 foodList.innerHTML = "<p>ยังไม่มีเมนูอาหารสำหรับร้านนี้</p>";
                 return;
             }
 
             foodList.innerHTML = "";
             foods.forEach(food => {
-                const imageUrl = formatFoodImage(food.image);
+                const fid = Number(food.id);
+                const fallback = fallbackMenuCatalog[fid] || {};
+                const foodName = fallback.name || food.name;
+                const foodPrice = fallback.price || Number(food.price);
+                const imageUrl = formatFoodImage(food.image, fid);
+
                 const foodCard = document.createElement("article");
                 foodCard.className = "food-card";
                 
                 foodCard.innerHTML = `
-                    <img src="${imageUrl}" alt="${food.name}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
+                    <img src="${imageUrl}" alt="${foodName}" onerror="this.onerror=null; this.src='Image/logoweb.png';">
                     <div class="food-info">
-                        <h3>${food.name}</h3>
+                        <h3>${foodName}</h3>
                         <p>${food.description || ""}</p>
-                        <strong>${Number(food.price).toLocaleString()} บาท</strong>
+                        <strong>${foodPrice.toLocaleString()} บาท</strong>
                         <button type="button" class="btn-add-cart">
                             เพิ่มลงตะกร้า
                         </button>
@@ -99,9 +189,7 @@
 
                 const btn = foodCard.querySelector(".btn-add-cart");
                 btn.addEventListener("click", () => {
-                    if (typeof addToCart === "function") {
-                        addToCart(food.name, food.price, imageUrl, restaurantId, food.id);
-                    }
+                    handleDirectAddToCart(foodName, foodPrice, imageUrl, restaurantId, fid);
                 });
 
                 foodList.appendChild(foodCard);
@@ -111,6 +199,15 @@
             console.error("เกิดข้อผิดพลาดในการโหลดเมนู:", error);
             document.getElementById("food-list").innerHTML = "<p>ไม่สามารถโหลดเมนูอาหารได้</p>";
         });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : null;
+        const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+        if (userId) {
+            updateHeaderCartCount(userId);
+        }
+    });
 </script>
 
 </body>

@@ -70,6 +70,20 @@
 <script src="script.js"></script>
 
 <script>
+    async function updateHeaderCartCount(userId) {
+        if (!userId) return;
+        try {
+            const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
+            const data = await res.json();
+            const items = data.data || data.items || [];
+            const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
+            const badge = document.getElementById("cart-count");
+            if (badge) badge.textContent = totalQty;
+        } catch (err) {
+            console.error("Cart count update error:", err);
+        }
+    }
+
     async function handleBurgerAddToCart(name, price, image, restaurantId, foodId) {
         const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
         const currentUser = rawUser ? JSON.parse(rawUser) : null;
@@ -82,7 +96,6 @@
         }
 
         try {
-            // ยิงเข้าตาราง carts ใน MySQL โดยตรง
             const res = await fetch("/api/cart", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -100,27 +113,24 @@
             const data = await res.json();
             if (res.ok && data.success) {
                 alert(`✅ เพิ่ม "${name}" ลงในตะกร้าเรียบร้อยแล้ว!`);
-                
-                // อัปเดตตัวเลขนับตะกร้าบน Header
-                const cartCountEl = document.getElementById("cart-count");
-                if (cartCountEl) {
-                    const cRes = await fetch(`/api/cart/${userId}?_t=${Date.now()}`);
-                    const cData = await cRes.json();
-                    const items = cData.data || cData.items || [];
-                    const totalQty = items.reduce((sum, it) => sum + Number(it.quantity || 1), 0);
-                    cartCountEl.textContent = totalQty;
-                }
+                await updateHeaderCartCount(userId);
             } else {
                 alert(data.message || "ไม่สามารถเพิ่มลงในตะกร้าได้");
             }
         } catch (err) {
             console.error("Cart error:", err);
-            // fallback หากเซิร์ฟเวอร์มีปัญหา
-            if (typeof addToCart === "function") {
-                addToCart(name, price, image, restaurantId, foodId);
-            }
+            alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
         }
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : null;
+        const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
+        if (userId) {
+            updateHeaderCartCount(userId);
+        }
+    });
 </script>
 
 </body>

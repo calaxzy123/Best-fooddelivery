@@ -7,7 +7,6 @@
     <title>BestFood Delivery - สั่งอาหารออนไลน์</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* สไตล์กล่องกระเป๋าเงินลูกค้าบน Header */
         .customer-wallet-badge {
             display: none;
             align-items: center;
@@ -84,7 +83,7 @@
             </div>
 
             <div class="hero-image">
-                <img src="Image/logoweb.png" alt="Logo" class="hero-food">
+                <img src="Image/logoweb.png" alt="Logo" class="hero-food" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             </div>
         </div>
     </section>
@@ -194,20 +193,20 @@
             </div>
 
             <div class="popular-food-grid">
-                <!-- กะเพราหมูสับ -->
+                <!-- กะเพราหมูสับ (food_id: 1, restaurant_id: 1) -->
                 <article class="popular-food-card">
                     <div class="popular-food-image">
                         <img src="Image/kapao-moosub.jpg" alt="กะเพราหมูสับ" onerror="this.onerror=null; this.src='Image/logoweb.png';">
                     </div>
                     <div class="popular-food-info">
-                        <h3>กะเพราหมูสับ</h3>
+                        <h3>ข้าวกะเพราหมูสับ</h3>
                         <p>ร้านกะเพราอร่อย</p>
-                        <strong>฿60</strong>
-                        <button type="button" onclick="handleIndexAddToCart('กะเพราหมูสับ', 50, 'Image/kapao-moosub.jpg', 1, 1)">เพิ่มลงตะกร้า</button>
+                        <strong>฿50</strong>
+                        <button type="button" onclick="handleIndexAddToCart('ข้าวกะเพราหมูสับ', 50, 'Image/kapao-moosub.jpg', 1, 1)">เพิ่มลงตะกร้า</button>
                     </div>
                 </article>
 
-                <!-- Pepperoni Pizza -->
+                <!-- Pepperoni Pizza (food_id: 7, restaurant_id: 2) -->
                 <article class="popular-food-card">
                     <div class="popular-food-image">
                         <img src="Image/pepperoni pizza.jpg" alt="Pepperoni Pizza" onerror="this.onerror=null; this.src='Image/logoweb.png';">
@@ -215,12 +214,12 @@
                     <div class="popular-food-info">
                         <h3>Pepperoni Pizza</h3>
                         <p>Pizza House</p>
-                        <strong>฿179</strong>
+                        <strong>฿249</strong>
                         <button type="button" onclick="handleIndexAddToCart('Pepperoni Pizza', 249, 'Image/pepperoni pizza.jpg', 2, 7)">เพิ่มลงตะกร้า</button>
                     </div>
                 </article>
 
-                <!-- Cheese Burger -->
+                <!-- Cheese Burger (food_id: 9, restaurant_id: 3) -->
                 <article class="popular-food-card">
                     <div class="popular-food-image">
                         <img src="Image/burgercheese.jpg" alt="Cheese Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
@@ -253,10 +252,10 @@
             }
         }
 
-        // จัดการเพิ่มสินค้าจากหน้าแรกเข้าตะกร้าพร้อมเชื่อมต่อ API
         async function handleIndexAddToCart(foodName, price, image, restaurantId, foodId) {
-            const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-            const userId = currentUser.id || localStorage.getItem("userId");
+            const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+            const currentUser = rawUser ? JSON.parse(rawUser) : null;
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
 
             if (!userId) {
                 alert("กรุณาเข้าสู่ระบบก่อนสั่งอาหาร");
@@ -273,6 +272,8 @@
                         user_id: Number(userId),
                         foodId: Number(foodId),
                         food_id: Number(foodId),
+                        restaurantId: Number(restaurantId),
+                        restaurant_id: Number(restaurantId),
                         quantity: 1
                     })
                 });
@@ -286,15 +287,10 @@
                 }
             } catch (err) {
                 console.error("Add to cart error:", err);
-                if (typeof addToCart === "function") {
-                    addToCart(foodName, price, image, restaurantId, foodId);
-                } else {
-                    alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
-                }
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
             }
         }
 
-        // ฟังก์ชันดึงยอดเงินกระเป๋าเงินลูกค้า
         async function loadCustomerWallet(userId) {
             try {
                 const res = await fetch(`/api/wallet/${userId}?_t=${Date.now()}`);
@@ -311,10 +307,10 @@
             }
         }
 
-        // ฟังก์ชันกดเติมเงินสำหรับลูกค้า
         async function promptCustomerTopup() {
-            const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-            const userId = currentUser.id || localStorage.getItem("userId");
+            const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+            const currentUser = rawUser ? JSON.parse(rawUser) : null;
+            const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
 
             if (!userId) {
                 alert("กรุณาเข้าสู่ระบบก่อนทำรายการ");
@@ -351,10 +347,11 @@
 
         async function syncIndexUI() {
             try {
-                const userStr = localStorage.getItem("currentUser");
+                const userStr = localStorage.getItem("currentUser") || localStorage.getItem("user");
                 if (!userStr) return;
                 const user = JSON.parse(userStr);
-                if (!user || !user.id) return;
+                const uid = user.id || user.userId;
+                if (!uid) return;
 
                 const authLink = document.getElementById("authNav");
                 const role = (user.role || '').toLowerCase();
@@ -367,9 +364,7 @@
                         authLink.textContent = `🛵 ${user.name} (ไรเดอร์)`;
                         authLink.href = 'rider.html';
                     } else {
-                        // ลูกค้าทั่วไป -> โหลดกระเป๋าเงินลูกค้ามาแสดง
-                        loadCustomerWallet(user.id);
-
+                        loadCustomerWallet(uid);
                         authLink.textContent = `👤 ${user.name} (ออกจากระบบ)`;
                         authLink.href = "#";
                         authLink.onclick = (e) => {
@@ -382,7 +377,7 @@
                     }
                 }
 
-                const res = await fetch(`/api/cart/${user.id}?_t=${Date.now()}`, { cache: "no-store" });
+                const res = await fetch(`/api/cart/${uid}?_t=${Date.now()}`, { cache: "no-store" });
                 if (!res.ok) return;
 
                 const json = await res.json();

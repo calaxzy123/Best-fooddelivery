@@ -1,19 +1,35 @@
-// Database.js
+// database.js
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
 class Database {
   constructor() {
-    // ป้องกันไม่ให้สร้าง connection ซ้ำซ้อน (Singleton Pattern)
     if (!Database.instance) {
-      // ตรวจสอบว่าระบบมี connection string ก้อนเดียว (เช่น บน Railway / Render) หรือไม่
-      const connectionUri = process.env.MYSQL_URL || process.env.DATABASE_URL;
+      const rawUri = process.env.MYSQL_URL || process.env.DATABASE_URL;
 
-      if (connectionUri) {
-        this.pool = mysql.createPool(connectionUri);
+      if (rawUri) {
+        // ล้าง query parameters ที่ mysql2 ไม่รองรับออก เช่น ssl-mode
+        let cleanUri = rawUri;
+        try {
+          const parsed = new URL(rawUri);
+          parsed.searchParams.delete('ssl-mode');
+          cleanUri = parsed.toString();
+        } catch (e) {
+          cleanUri = rawUri.replace(/[?&]ssl-mode=[^&]+/gi, '');
+        }
+
+        this.pool = mysql.createPool({
+          uri: cleanUri,
+          waitForConnections: true,
+          connectionLimit: 10,
+          queueLimit: 0,
+          connectTimeout: 20000,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 10000,
+          ssl: { rejectUnauthorized: false }
+        });
       } else {
         this.pool = mysql.createPool({
-          // รองรับทั้งชื่อตัวแปรของ Railway (MYSQLHOST...) และตัวแปรมาตรฐาน (DB_HOST...)
           host: process.env.MYSQLHOST || process.env.DB_HOST || 'localhost',
           user: process.env.MYSQLUSER || process.env.DB_USER || 'root',
           password: process.env.MYSQLPASSWORD !== undefined 
@@ -24,10 +40,12 @@ class Database {
           waitForConnections: true,
           connectionLimit: 10,
           queueLimit: 0,
+          connectTimeout: 20000,
           enableKeepAlive: true,
           keepAliveInitialDelay: 10000,
-          // รองรับ SSL เมื่อขึ้น Cloud Database
-          ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+          ssl: process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production' 
+            ? { rejectUnauthorized: false } 
+            : undefined
         });
       }
 
@@ -36,7 +54,6 @@ class Database {
     return Database.instance;
   }
 
-  // ฟังก์ชันสำหรับแจกจ่าย Connection Pool ให้ไฟล์อื่นนำไปใช้ query
   getPool() {
     return this.pool;
   }

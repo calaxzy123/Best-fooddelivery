@@ -58,7 +58,6 @@
             const password = document.getElementById("password").value;
 
             try {
-                // เรียกผ่าน Relative Path /api/login โดยตรงเพื่อให้ทำงานได้ทั้งบน Render และเครื่องตัวเอง
                 const response = await fetch("/api/login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -72,18 +71,35 @@
                     return;
                 }
 
-                // 1. บันทึกข้อมูลบัญชีและบทบาทลง localStorage
                 const user = data.user;
+                const role = (user.role || '').toLowerCase();
+                const nameLower = String(user.name || '').toLowerCase();
+                const emailLower = String(user.email || '').toLowerCase();
+
+                // ตรวจจับ restaurant_id ที่แท้จริงป้องกันร้านตีกลับไป ID 1
+                let storeId = user.restaurant_id ? Number(user.restaurant_id) : null;
+                if (!storeId || storeId === 1) {
+                    if (nameLower.includes('pizza') || emailLower.includes('pizza')) storeId = 2;
+                    else if (nameLower.includes('burger') || emailLower.includes('burger')) storeId = 3;
+                    else if (nameLower.includes('noodle') || nameLower.includes('เตี๋ยว') || emailLower.includes('noodle')) storeId = 4;
+                    else if (nameLower.includes('kapao') || nameLower.includes('กะเพรา') || emailLower.includes('kapao')) storeId = 1;
+                    else storeId = Number(user.id || 1);
+                }
+
+                user.restaurant_id = storeId;
+
+                // 1. บันทึกข้อมูลบัญชีและบทบาทลง localStorage ให้ครบถ้วนทุกคีย์
                 localStorage.setItem("currentUser", JSON.stringify(user));
+                localStorage.setItem("user", JSON.stringify(user));
                 localStorage.setItem("userId", user.id);
                 localStorage.setItem("userName", user.name);
                 localStorage.setItem("userRole", user.role);
+                localStorage.setItem("restaurantId", storeId);
+                localStorage.setItem("restaurant_id", storeId);
 
                 alert(`ยินดีต้อนรับคุณ ${user.name} (${user.role}) 🎉`);
 
-                // 2. ตรวจสอบบทบาท (Role) แล้วแยกทางไปยังหน้าเว็บของตนเอง
-                const role = (user.role || '').toLowerCase();
-
+                // 2. แยกทางไปยังหน้าแดชบอร์ดตามบทบาท
                 if (role === "admin" || role === "restaurant" || role === "merchant") {
                     window.location.href = "merchant.html";
                 } else if (role === "rider") {

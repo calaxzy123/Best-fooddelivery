@@ -6,7 +6,7 @@
     <title>คำสั่งซื้อของฉัน - BestFood Delivery</title>
     <link rel="stylesheet" href="css/style.css">
     
-    <!-- แผนที่ OpenStreetMap + Leaflet (ฟรี 100%) -->
+    <!-- แผนที่ OpenStreetMap + Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -238,7 +238,7 @@
                     <button type="button" class="btn-cancel" onclick="cancelCurrentOrder()">
                         ❌ ขอยกเลิกคำสั่งซื้อ
                     </button>
-                    <p style="font-size: 12px; color: #888; margin-top: 6px;">* สามารถยกเลิกได้เฉพาะก่อนร้านค้าเริ่มปรุงอาหารเท่านั้น</p>
+                    <p style="font-size: 12px; color: #888; margin-top: 6px;">สามารถยกเลิกได้เฉพาะก่อนร้านค้าเริ่มปรุงอาหารเท่านั้น</p>
                 </div>
 
                 <div style="text-align: center; margin-top: 20px;">
@@ -261,8 +261,23 @@
 
     <script src="script.js?v=6.0"></script>
     <script>
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const userId = currentUser.id || localStorage.getItem("userId");
+        const storeCatalog = {
+            1: "🍛 ร้านกะเพราอร่อย",
+            2: "🍕 Pizza House",
+            3: "🍔 Burger Station",
+            4: "🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย"
+        };
+
+        const fallbackMenuCatalog = {
+            1: "ข้าวกะเพราหมูสับ", 2: "ข้าวกะเพราไก่", 3: "ข้าวกะเพราเนื้อ", 4: "ไข่ดาว",
+            5: "Pizza Margherita", 6: "Pizza Hawaiian", 7: "Pepperoni Pizza",
+            8: "Classic Burger", 9: "Cheese Burger", 10: "Chicken Burger",
+            11: "ก๋วยเตี๋ยวต้มยำ", 12: "ก๋วยเตี๋ยวหมู", 13: "ก๋วยเตี๋ยวเนื้อ"
+        };
+
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : {};
+        const userId = currentUser.id || currentUser.userId || localStorage.getItem("userId");
 
         if (!userId) {
             alert("กรุณาเข้าสู่ระบบก่อนเข้าดูคำสั่งซื้อ");
@@ -296,16 +311,21 @@
                 if (!data.order) return;
 
                 const ord = data.order;
+                const rId = Number(ord.restaurant_id || 1);
+                const storeName = ord.restaurant_name || storeCatalog[rId] || `ร้านค้ารหัส #${rId}`;
+
                 document.getElementById("orderHeading").innerText = `คำสั่งซื้อ #${ord.id}`;
-                document.getElementById("orderRestaurant").innerText = `ร้าน: ${ord.restaurant_name || '-'}`;
+                document.getElementById("orderRestaurant").innerText = `ร้าน: ${storeName}`;
                 document.getElementById("custName").innerText = ord.customer_name || currentUser.name || 'ลูกค้า';
                 document.getElementById("deliveryAddress").innerText = ord.delivery_address || '-';
                 
-                const pMethod = ord.payment_method || '';
-                if (pMethod.includes('cash') || pMethod.includes('ปลายทาง')) {
-                    document.getElementById("paymentMethod").innerText = '💵 เก็บเงินปลายทาง';
+                const pMethod = String(ord.payment_method || '').toLowerCase();
+                if (pMethod === 'wallet') {
+                    document.getElementById("paymentMethod").innerText = '💼 ชำระผ่านกระเป๋าเงิน (Wallet)';
+                } else if (pMethod.includes('cash') || pMethod.includes('ปลายทาง')) {
+                    document.getElementById("paymentMethod").innerText = '💵 เก็บเงินปลายทาง (Cash on Delivery)';
                 } else {
-                    document.getElementById("paymentMethod").innerText = '📱 โอนเงิน / พร้อมเพย์';
+                    document.getElementById("paymentMethod").innerText = '📱 โอนเงิน / พร้อมเพย์ (PromptPay)';
                 }
 
                 document.getElementById("orderTotalAmount").innerText = `${Number(ord.total_amount).toLocaleString()} บาท`;
@@ -317,7 +337,8 @@
                     itemsList.innerHTML = "<p style='color:#888; font-size:14px;'>ไม่มีรายการอาหาร</p>";
                 } else {
                     itemsList.innerHTML = items.map(it => {
-                        const foodName = it.food_name || it.name || `อาหารรหัส #${it.food_id}`;
+                        const fid = Number(it.food_id || it.id);
+                        const foodName = it.food_name || it.name || fallbackMenuCatalog[fid] || `อาหารรหัส #${fid}`;
                         const qty = Number(it.quantity) || 1;
                         const price = Number(it.price) || 0;
                         const total = (price * qty).toLocaleString();
@@ -483,10 +504,13 @@
 
                 container.innerHTML = orders.map(ord => {
                     const date = new Date(ord.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+                    const rId = Number(ord.restaurant_id || 1);
+                    const sName = ord.restaurant_name || storeCatalog[rId] || `ร้านอาหาร #${rId}`;
+
                     return `
                         <div class="order-history-card">
                             <div>
-                                <h3 style="margin: 0 0 5px 0;">คำสั่งซื้อ #${ord.id} - ${ord.restaurant_name}</h3>
+                                <h3 style="margin: 0 0 5px 0;">คำสั่งซื้อ #${ord.id} - ${sName}</h3>
                                 <div style="font-size: 13px; color: #6c757d; margin-bottom: 6px;">📅 วันที่สั่ง: ${date}</div>
                                 <div style="font-weight: bold; color: #d90429;">ยอดรวม: ${Number(ord.total_amount).toLocaleString()} บาท</div>
                             </div>

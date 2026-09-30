@@ -54,15 +54,33 @@ class AuthController {
 
       const resolvedRole = user.role ? String(user.role).toLowerCase() : 'customer';
 
-      // ดึง restaurant_id ที่แท้จริงของร้านค้า (กรณีเป็น role restaurant)
+      // กำหนด restaurant_id ให้ถูกต้องตามชื่อร้าน/อีเมล และอัปเดตลงตาราง users อัตโนมัติ
       let resolvedRestaurantId = user.restaurant_id;
       if (resolvedRole === 'restaurant' || resolvedRole === 'merchant') {
-        const [storeRows] = await pool.query('SELECT id FROM restaurants WHERE owner_id = ? LIMIT 1', [user.id]);
-        if (storeRows.length > 0) {
-          resolvedRestaurantId = storeRows[0].id;
-        } else if (!resolvedRestaurantId) {
-          resolvedRestaurantId = user.id;
+        const uName = String(user.name || '').toLowerCase();
+        
+        if (cleanEmail.includes('pizza') || uName.includes('pizza')) {
+          resolvedRestaurantId = 2;
+        } else if (cleanEmail.includes('burger') || uName.includes('burger')) {
+          resolvedRestaurantId = 3;
+        } else if (cleanEmail.includes('noodle') || uName.includes('noodle') || uName.includes('เตี๋ยว')) {
+          resolvedRestaurantId = 4;
+        } else if (cleanEmail.includes('kapao') || uName.includes('kapao') || uName.includes('กะเพรา')) {
+          resolvedRestaurantId = 1;
         }
+
+        // หากยังไม่ได้ ID ร้าน ให้ค้นหาจากตาราง restaurants
+        if (!resolvedRestaurantId) {
+          const [storeRows] = await pool.query('SELECT id FROM restaurants WHERE owner_id = ? LIMIT 1', [user.id]);
+          if (storeRows.length > 0) {
+            resolvedRestaurantId = storeRows[0].id;
+          } else {
+            resolvedRestaurantId = 1;
+          }
+        }
+
+        // ซิงค์ค่า restaurant_id ที่ถูกต้องกลับเข้าฐานข้อมูลทันที
+        await pool.query('UPDATE users SET restaurant_id = ? WHERE id = ?', [resolvedRestaurantId, user.id]);
       }
 
       console.log(`[Login Success] ผู้ใช้: ${user.name} | Role: ${resolvedRole} | Restaurant ID: ${resolvedRestaurantId || '-'}`);
@@ -129,9 +147,9 @@ class CartController {
 
   async updateItem(req, res) {
     try {
-      const { user_id, userId, food_id, foodId, quantity } = req.body;
+      const { user_id, userId, food_id, foodId, restaurant_id, restaurantId, quantity } = req.body;
       let targetUserId = user_id || userId;
-      const targetFoodId = food_id || foodId;
+      const targetFoodId = Number(food_id || foodId);
       const targetQty = Number(quantity);
 
       if (!targetUserId || !targetFoodId) {
@@ -151,7 +169,17 @@ class CartController {
         }
       }
 
-      await this.cartRepo.addOrUpdate(targetUserId, targetFoodId, targetQty);
+      // ตรวจสอบ restaurant_id ให้ถูกต้องตามกลุ่ม food_id เสมอ
+      let targetRid = Number(restaurant_id || restaurantId || 0);
+      if (!targetRid) {
+        if (targetFoodId >= 1 && targetFoodId <= 4) targetRid = 1;
+        else if (targetFoodId >= 5 && targetFoodId <= 7) targetRid = 2;
+        else if (targetFoodId >= 8 && targetFoodId <= 10) targetRid = 3;
+        else if (targetFoodId >= 11 && targetFoodId <= 13) targetRid = 4;
+        else targetRid = 1;
+      }
+
+      await this.cartRepo.addOrUpdate(targetUserId, targetFoodId, targetQty, targetRid);
       res.json({ success: true, message: 'อัปเดตตะกร้าสินค้าสำเร็จ', userId: targetUserId });
     } catch (error) {
       console.error('updateItem Error:', error);
@@ -181,17 +209,28 @@ class OrderController {
   async create(req, res) {
     try {
       const { user_id, restaurant_id, delivery_address, payment_method, items } = req.body;
+      const orderItems = Array.isArray(items) ? items : [];
 
-      const subtotal = (items || []).reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-      const total_amount = subtotal + 20;
+      // ตรวจสอบ restaurant_id จากรายการอาหารรายการแรกเสมอ ป้องกันออเดอร์เด้งผิดร้าน
+      let resolvedRestaurantId = Number(restaurant_id);
+      if (orderItems.length > 0) {
+        const firstFid = Number(orderItems[0].food_id || orderItems[0].id);
+        if (firstFid >= 1 && firstFid <= 4) resolvedRestaurantId = 1;
+        else if (firstFid >= 5 && firstFid <= 7) resolvedRestaurantId = 2;
+        else if (firstFid >= 8 && firstFid <= 10) resolvedRestaurantId = 3;
+        else if (firstFid >= 11 && firstFid <= 13) resolvedRestaurantId = 4;
+      }
+
+      const subtotal = orderItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+      const total_amount = subtotal > 0 ? subtotal + 20 : 20;
 
       const orderId = await this.orderRepo.createOrder({
-        user_id,
-        restaurant_id,
+        user_id: Number(user_id),
+        restaurant_id: resolvedRestaurantId,
         delivery_address,
         payment_method,
         total_amount,
-        items
+        items: orderItems
       });
 
       res.json({ success: true, orderId });

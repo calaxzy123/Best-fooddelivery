@@ -175,7 +175,24 @@
 
     <script src="script.js"></script>
     <script>
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const fallbackMenuCatalog = {
+            1: { name: "ข้าวกะเพราหมูสับ", price: 50, restaurant_id: 1 },
+            2: { name: "ข้าวกะเพราไก่", price: 50, restaurant_id: 1 },
+            3: { name: "ข้าวกะเพราเนื้อ", price: 70, restaurant_id: 1 },
+            4: { name: "ไข่ดาว", price: 10, restaurant_id: 1 },
+            5: { name: "Pizza Margherita", price: 199, restaurant_id: 2 },
+            6: { name: "Pizza Hawaiian", price: 229, restaurant_id: 2 },
+            7: { name: "Pepperoni Pizza", price: 249, restaurant_id: 2 },
+            8: { name: "Classic Burger", price: 129, restaurant_id: 3 },
+            9: { name: "Cheese Burger", price: 149, restaurant_id: 3 },
+            10: { name: "Chicken Burger", price: 139, restaurant_id: 3 },
+            11: { name: "ก๋วยเตี๋ยวต้มยำ", price: 50, restaurant_id: 4 },
+            12: { name: "ก๋วยเตี๋ยวหมู", price: 45, restaurant_id: 4 },
+            13: { name: "ก๋วยเตี๋ยวเนื้อ", price: 60, restaurant_id: 4 }
+        };
+
+        const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+        const currentUser = rawUser ? JSON.parse(rawUser) : {};
         const userId = currentUser.id || currentUser.userId || localStorage.getItem("userId");
         let cartItems = [];
         let currentGrandTotal = 0;
@@ -261,15 +278,18 @@
             }
         }
 
-        // จับคู่ ID ร้านค้าให้ตรงกับมาตรฐานจริง 100%
+        // ระบุ ID ร้านค้าที่ถูกต้องตามกลุ่มอาหาร 100%
         function resolveRestaurantId(foodId, existingRId) {
-    const fId = Number(foodId);
-    if (fId >= 1 && fId <= 4) return 1;
-    if (fId >= 5 && fId <= 7) return 2;
-    if (fId >= 8 && fId <= 10) return 3;
-    if (fId >= 11 && fId <= 13) return 4;
-    return Number(existingRId || 1);
-}
+            const fId = Number(foodId);
+            if (fallbackMenuCatalog[fId]) {
+                return fallbackMenuCatalog[fId].restaurant_id;
+            }
+            if (fId >= 1 && fId <= 4) return 1;
+            if (fId >= 5 && fId <= 7) return 2;
+            if (fId >= 8 && fId <= 10) return 3;
+            if (fId >= 11 && fId <= 13) return 4;
+            return Number(existingRId || 1);
+        }
 
         async function loadCheckoutSummary() {
             const itemsContainer = document.getElementById("checkout-items");
@@ -295,8 +315,9 @@
                 rawItems.forEach(it => {
                     const fId = Number(it.food_id || it.foodId || it.id);
                     const qty = Number(it.quantity || 1);
-                    const price = Number(it.price || 0);
-                    const name = it.name || it.food_name || `อาหารรหัส #${fId}`;
+                    const fallback = fallbackMenuCatalog[fId] || {};
+                    const price = fallback.price || Number(it.price || 0);
+                    const name = fallback.name || it.name || it.food_name || `อาหารรหัส #${fId}`;
                     const rId = resolveRestaurantId(fId, it.restaurant_id || it.restaurantId);
 
                     if (!grouped[fId]) {
@@ -420,9 +441,8 @@
                     localStorage.removeItem(`cart_${userId}`);
                     localStorage.removeItem("cart");
 
-                    if (window.cartManager) {
-                        await window.cartManager.updateCartBadge();
-                    }
+                    const badge = document.getElementById("cart-count");
+                    if (badge) badge.textContent = "0";
 
                     alert(`🎉 สั่งซื้อสำเร็จ! (สร้างคำสั่งซื้อทั้งหมด ${createdOrderIds.length} รายการ)`);
 

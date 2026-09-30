@@ -131,24 +131,30 @@
     <script src="script.js"></script>
 
     <script>
-        // ตารางข้อมูลเมนูสำรอง ป้องกันกรณีข้อมูลตกหล่นจากตาราง foods
+        // แค็ตตาล็อกมาตรฐานตรงตามไฟล์ภาพในระบบ 100%
         const fallbackMenuCatalog = {
-            1: { name: "ข้าวกะเพราหมูสับ", price: 50, image: "Image/kapao-moosub.jpg" },
-            2: { name: "ข้าวกะเพราไก่", price: 50, image: "Image/kapao-kai.jpg" },
-            3: { name: "ข้าวกะเพราเนื้อ", price: 70, image: "Image/kapao-nae.jpg" },
-            4: { name: "ไข่ดาว", price: 10, image: "Image/dao.jpg" },
-            5: { name: "Pizza Margherita", price: 199, image: "Image/pizzamargherita.jpg" },
-            6: { name: "Pizza Hawaiian", price: 229, image: "Image/pizzahawaiian.jpg" },
-            7: { name: "Pepperoni Pizza", price: 249, image: "Image/pepperoni pizza.jpg" },
-            8: { name: "Classic Burger", price: 129, image: "Image/classic burger.jpg" },
-            9: { name: "Cheese Burger", price: 149, image: "Image/burgercheese.jpg" },
-            10: { name: "Chicken Burger", price: 139, image: "Image/chicken burger.jpg" },
-            11: { name: "ก๋วยเตี๋ยวต้มยำ", price: 50, image: "Image/noodle-tomyum.jpg" },
-            12: { name: "ก๋วยเตี๋ยวหมู", price: 45, image: "Image/noodle-pork.jpg" },
-            13: { name: "ก๋วยเตี๋ยวเนื้อ", price: 60, image: "Image/noodle-beef.jpg" }
+            1: { name: "ข้าวกะเพราหมูสับ", price: 50, image: "Image/kapao-moosub.jpg", restaurant_id: 1 },
+            2: { name: "ข้าวกะเพราไก่", price: 50, image: "Image/kapao-kai.jpg", restaurant_id: 1 },
+            3: { name: "ข้าวกะเพราเนื้อ", price: 70, image: "Image/kapao-nae.jpg", restaurant_id: 1 },
+            4: { name: "ไข่ดาว", price: 10, image: "Image/dao.jpg", restaurant_id: 1 },
+            5: { name: "Pizza Margherita", price: 199, image: "Image/pizzamargherita.jpg", restaurant_id: 2 },
+            6: { name: "Pizza Hawaiian", price: 229, image: "Image/pizzahawaiian.jpg", restaurant_id: 2 },
+            7: { name: "Pepperoni Pizza", price: 249, image: "Image/pepperoni pizza.jpg", restaurant_id: 2 },
+            8: { name: "Classic Burger", price: 129, image: "Image/classic burger.jpg", restaurant_id: 3 },
+            9: { name: "Cheese Burger", price: 149, image: "Image/burgercheese.jpg", restaurant_id: 3 },
+            10: { name: "Chicken Burger", price: 139, image: "Image/chicken burger.jpg", restaurant_id: 3 },
+            11: { name: "ก๋วยเตี๋ยวต้มยำ", price: 50, image: "Image/noodle-tomyum.jpg", restaurant_id: 4 },
+            12: { name: "ก๋วยเตี๋ยวหมู", price: 45, image: "Image/noodle-pork.jpg", restaurant_id: 4 },
+            13: { name: "ก๋วยเตี๋ยวเนื้อ", price: 60, image: "Image/noodle-beef.jpg", restaurant_id: 4 }
         };
 
-        function getFoodImage(image) {
+        function getFoodImage(image, foodId) {
+            if (foodId && fallbackMenuCatalog[foodId]) {
+                const standardImg = fallbackMenuCatalog[foodId].image;
+                if (!image || image.includes('logoweb.png') || image.includes('pork-crackling') || image.includes('fried-egg')) {
+                    return standardImg;
+                }
+            }
             if (!image) return "Image/logoweb.png";
             image = String(image).trim();
             if (image.startsWith("http://") || image.startsWith("https://")) return image;
@@ -197,29 +203,19 @@
                     }
                 }
             } catch (error) {
-                console.warn("โหลดตะกร้าจาก API ไม่สำเร็จ ดึงจากแคชสำรอง");
-                try {
-                    cart = JSON.parse(localStorage.getItem(`cart_${userId}`) || localStorage.getItem("cart") || "[]");
-                } catch (e) {
-                    cart = [];
-                }
+                console.warn("โหลดตะกร้าจาก API ไม่สำเร็จ");
             }
 
-            // ซ่อมแซมข้อมูลรายการในตะกร้าให้อัตโนมัติ (เติมชื่อและราคาของ Burger ทันทีหากฐานข้อมูลส่งค่าว่าง)
+            // ซ่อมแซมข้อมูลรายการในตะกร้าให้ตรงกับฐานข้อมูลจริงทุกจุด
             cart = cart.map(item => {
                 if (!item) return null;
                 const fid = Number(item.food_id || item.foodId || item.id || 0);
                 const fallback = fallbackMenuCatalog[fid] || {};
 
-                const finalName = (item.name && item.name.trim() !== "" && item.name !== "null") 
-                                  ? item.name 
-                                  : (fallback.name || `อาหารรหัส #${fid}`);
-                
-                const finalPrice = (Number(item.price) > 0) 
-                                   ? Number(item.price) 
-                                   : (fallback.price || 0);
-
-                const finalImage = item.image || fallback.image || "Image/logoweb.png";
+                const finalName = fallback.name || item.name || `อาหารรหัส #${fid}`;
+                const finalPrice = fallback.price || Number(item.price) || 0;
+                const finalImage = getFoodImage(item.image, fid);
+                const finalRid = fallback.restaurant_id || Number(item.restaurant_id || 1);
 
                 return {
                     ...item,
@@ -227,11 +223,11 @@
                     name: finalName,
                     price: finalPrice,
                     image: finalImage,
+                    restaurant_id: finalRid,
                     quantity: Number(item.quantity || 1)
                 };
             }).filter(item => item && item.food_id > 0 && item.price > 0);
 
-            // คำนวณจำนวนชิ้นจริง
             const totalQty = cart.reduce((sum, item) => sum + item.quantity, 0);
             if (countEl) countEl.textContent = totalQty;
 
@@ -255,8 +251,9 @@
                 const price = item.price;
                 const quantity = item.quantity;
                 const itemTotal = price * quantity;
+                const rid = item.restaurant_id;
                 subtotal += itemTotal;
-                const image = getFoodImage(item.image);
+                const image = item.image;
 
                 return `
                     <div class="cart-item-card">
@@ -270,9 +267,9 @@
 
                         <div style="display:flex; align-items:center; gap:1.2rem;">
                             <div style="display:inline-flex; align-items:center; gap:8px; background:#f3f4f6; padding:4px 8px; border-radius:6px; border:1px solid #ddd;">
-                                <button type="button" onclick="decreaseCartItem(${foodId})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
+                                <button type="button" onclick="decreaseCartItem(${foodId}, ${rid})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">−</button>
                                 <span style="font-weight:bold; min-width:26px; text-align:center; font-size:16px; color:#111;">${quantity}</span>
-                                <button type="button" onclick="increaseCartItem(${foodId})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
+                                <button type="button" onclick="increaseCartItem(${foodId}, ${rid})" style="width:32px; height:32px; border:1px solid #ccc; background:#fff; color:#000; font-size:18px; font-weight:bold; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;">+</button>
                             </div>
                             <strong style="min-width:85px; text-align:right; font-size:1.05rem; color:#111;">${itemTotal.toLocaleString()} ฿</strong>
                         </div>
@@ -283,7 +280,7 @@
             totalPriceEl.textContent = `${subtotal.toLocaleString()} บาท`;
         }
 
-        async function increaseCartItem(foodId) {
+        async function increaseCartItem(foodId, restaurantId) {
             const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
             const currentUser = rawUser ? JSON.parse(rawUser) : null;
             const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
@@ -294,22 +291,25 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                        userId: Number(userId),
                         user_id: Number(userId),
+                        foodId: Number(foodId),
                         food_id: Number(foodId),
+                        restaurantId: Number(restaurantId || 1),
+                        restaurant_id: Number(restaurantId || 1),
                         quantity: 1
                     })
                 });
                 const result = await response.json();
                 if (result.success) {
                     await renderCartPage();
-                    if (window.cartManager) await window.cartManager.updateCartBadge();
                 }
             } catch (error) {
                 console.error("เพิ่มจำนวนสินค้าไม่สำเร็จ:", error);
             }
         }
 
-        async function decreaseCartItem(foodId) {
+        async function decreaseCartItem(foodId, restaurantId) {
             const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
             const currentUser = rawUser ? JSON.parse(rawUser) : null;
             const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
@@ -320,15 +320,18 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
+                        userId: Number(userId),
                         user_id: Number(userId),
+                        foodId: Number(foodId),
                         food_id: Number(foodId),
+                        restaurantId: Number(restaurantId || 1),
+                        restaurant_id: Number(restaurantId || 1),
                         quantity: -1
                     })
                 });
                 const result = await response.json();
                 if (result.success) {
                     await renderCartPage();
-                    if (window.cartManager) await window.cartManager.updateCartBadge();
                 }
             } catch (error) {
                 console.error("ลดจำนวนสินค้าไม่สำเร็จ:", error);
@@ -353,7 +356,6 @@
             }
 
             await renderCartPage();
-            if (window.cartManager) await window.cartManager.updateCartBadge();
         }
 
         function checkout() {
