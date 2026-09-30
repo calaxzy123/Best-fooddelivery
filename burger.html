@@ -28,36 +28,36 @@
     <p>เบอร์เกอร์ทำสดใหม่ทุกออเดอร์</p>
 
     <section class="food-grid">
-        <!-- Classic Burger (food_id = 7, restaurant_id = 3) -->
+        <!-- Classic Burger (food_id = 5, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/classic burger.jpg" alt="Classic Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Classic Burger</h3>
                 <p>เบอร์เกอร์เนื้อพร้อมผักสดและซอสสูตรพิเศษ</p>
                 <strong>129 บาท</strong>
-                <button type="button" onclick="addToCart('Classic Burger', 129, 'Image/classic burger.jpg', 3, 7)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="addToCart('Classic Burger', 129, 'Image/classic burger.jpg', 3, 5)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
 
-        <!-- Cheese Burger (food_id = 8, restaurant_id = 3) -->
+        <!-- Cheese Burger (food_id = 6, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/burgercheese.jpg" alt="Cheese Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Cheese Burger</h3>
                 <p>เบอร์เกอร์เนื้อและชีสเยิ้ม ๆ</p>
                 <strong>149 บาท</strong>
-                <button type="button" onclick="addToCart('Cheese Burger', 149, 'Image/burgercheese.jpg', 3, 8)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="addToCart('Cheese Burger', 149, 'Image/burgercheese.jpg', 3, 6)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
 
-        <!-- Chicken Burger (food_id = 9, restaurant_id = 3) -->
+        <!-- Chicken Burger (food_id = 7, restaurant_id = 3) -->
         <article class="food-card">
             <img src="Image/chicken burger.jpg" alt="Chicken Burger" onerror="this.onerror=null; this.src='Image/logoweb.png';">
             <div class="food-info">
                 <h3>Chicken Burger</h3>
                 <p>เบอร์เกอร์ไก่กรอบพร้อมผักสด</p>
                 <strong>139 บาท</strong>
-                <button type="button" onclick="addToCart('Chicken Burger', 139, 'Image/chicken burger.jpg', 3, 9)">เพิ่มลงตะกร้า</button>
+                <button type="button" onclick="addToCart('Chicken Burger', 139, 'Image/chicken burger.jpg', 3, 7)">เพิ่มลงตะกร้า</button>
             </div>
         </article>
     </section>
@@ -67,17 +67,8 @@
     <p>© 2026 Food Delivery</p>
 </footer>
 
+<!-- เรียกใช้ script.js ตัวหลักเพียงตัวเดียวเพื่อไม่ให้ชนกัน -->
 <script src="script.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const authNav = document.getElementById("authNav");
-        if (currentUser.id && authNav) {
-            authNav.textContent = `👤 ${currentUser.name || 'โปรไฟล์'}`;
-            authNav.href = currentUser.role === 'restaurant' ? 'merchant.html' : (currentUser.role === 'rider' ? 'rider.html' : 'order.html');
-        }
-    });
-</script>
 
 </body>
 </html>

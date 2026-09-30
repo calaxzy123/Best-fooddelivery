@@ -14,24 +14,53 @@ class CartManager {
     }
   }
 
-  // 1. ฟังก์ชันเพิ่มสินค้าลงตะกร้า (เก็บทั้งใน LocalStorage ทันที และส่งไป Server)
-  async addToCart(name, price, image, restaurantId, foodId) {
+  // 1. ฟังก์ชันเพิ่มสินค้าลงตะกร้า รองรับ Parameter ทั้ง 2 รูปแบบอัตโนมัติ
+  async addToCart(arg1, arg2, arg3, arg4, arg5) {
     const currentUser = this.getCurrentUser();
     const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
 
     if (!userId) {
       alert("กรุณาเข้าสู่ระบบก่อนเลือกอาหาร");
-      window.location.href = "Login.html";
+      window.location.href = "login.html";
       return;
     }
 
-    // จัดการ Path รูปภาพให้ถูกต้อง (ขึ้นต้นด้วย Image/ เสมอ)
-    let formattedImage = image || "Image/logoweb.png";
-    if (formattedImage.startsWith("images/")) {
-      formattedImage = formattedImage.replace("images/", "Image/");
+    // จัดการตรวจจับพารามิเตอร์แบบยืดหยุ่น:
+    // รูปแบบ A: (name, price, image, restaurantId, foodId)
+    // รูปแบบ B: (foodId, name, price, image, restaurantId)
+    let foodId, name, price, image, restaurantId;
+
+    if (typeof arg1 === "number" || (!isNaN(Number(arg1)) && typeof arg2 === "string")) {
+      foodId = Number(arg1);
+      name = String(arg2 || "เมนูอาหาร");
+      price = Number(arg3 || 0);
+      image = arg4 || "Image/logoweb.png";
+      restaurantId = Number(arg5 || 1);
+    } else {
+      name = String(arg1 || "เมนูอาหาร");
+      price = Number(arg2 || 0);
+      image = arg3 || "Image/logoweb.png";
+      restaurantId = Number(arg4 || 1);
+      foodId = Number(arg5 || 0);
     }
 
-    // --- ส่วนที่ 1: บันทึกลง LocalStorage ทันที เพื่อให้ตะกร้าและตัวเลขหน้าเว็บทำงานทันที ---
+    if (!foodId || foodId <= 0) {
+      console.error("foodId ไม่ถูกต้อง:", { arg1, arg2, arg3, arg4, arg5 });
+      alert("เกิดข้อผิดพลาด: รหัสอาหารไม่ถูกต้อง");
+      return;
+    }
+
+    // จัดการ Path รูปภาพให้ถูกต้อง
+    let formattedImage = String(image).trim();
+    if (formattedImage.startsWith("images/")) {
+      formattedImage = formattedImage.replace(/^images\//, "Image/");
+    } else if (formattedImage.startsWith("image/")) {
+      formattedImage = formattedImage.replace(/^image\//, "Image/");
+    } else if (!formattedImage.startsWith("Image/") && !formattedImage.startsWith("http")) {
+      formattedImage = "Image/" + formattedImage;
+    }
+
+    // --- ส่วนที่ 1: บันทึกลง LocalStorage ทันที ---
     let localCart = [];
     try {
       localCart = JSON.parse(localStorage.getItem(`cart_${userId}`) || localStorage.getItem("cart") || "[]");
@@ -39,19 +68,22 @@ class CartManager {
       localCart = [];
     }
 
-    const existingIndex = localCart.findIndex(item => Number(item.foodId || item.id) === Number(foodId));
+    // ล้างรายการขยะ null ออกก่อนคำนวณ
+    localCart = localCart.filter(item => item && (item.food_id || item.foodId || item.id) && Number(item.price) > 0);
+
+    const existingIndex = localCart.findIndex(item => Number(item.food_id || item.foodId || item.id) === foodId);
     if (existingIndex > -1) {
       localCart[existingIndex].quantity = (Number(localCart[existingIndex].quantity) || 1) + 1;
     } else {
       localCart.push({
-        id: Number(foodId),
-        foodId: Number(foodId),
-        food_id: Number(foodId),
+        id: foodId,
+        foodId: foodId,
+        food_id: foodId,
         name: name,
-        price: Number(price),
+        price: price,
         image: formattedImage,
-        restaurantId: Number(restaurantId),
-        restaurant_id: Number(restaurantId),
+        restaurantId: restaurantId,
+        restaurant_id: restaurantId,
         quantity: 1
       });
     }
@@ -59,36 +91,28 @@ class CartManager {
     localStorage.setItem(`cart_${userId}`, JSON.stringify(localCart));
     localStorage.setItem("cart", JSON.stringify(localCart));
 
-    // อัปเดตตัวเลขหน้าแรกทันที ไม่ต้องรอ API
     this.updateCartBadge();
     alert(`เพิ่ม "${name}" ลงตะกร้าเรียบร้อยแล้ว 🛒`);
 
-    // --- ส่วนที่ 2: ส่งข้อมูลไปบันทึกบน Server / Database (Background Sync) ---
+    // --- ส่วนที่ 2: ส่งข้อมูลไปบันทึกบน Server Database ---
     try {
       await fetch(`${this.baseUrl}/cart`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: Number(userId),
           user_id: Number(userId),
-          foodId: Number(foodId),
           food_id: Number(foodId),
-          name: name,
-          price: Number(price),
-          image: formattedImage,
-          restaurantId: Number(restaurantId),
           restaurant_id: Number(restaurantId),
           quantity: 1
         })
       });
     } catch (error) {
-      console.warn("Server Cart Sync Warning (Offline/Fallback to LocalStorage):", error);
+      console.warn("Server Cart Sync Notice:", error);
     }
   }
 
-  // 2. ฟังก์ชันคำนวณและแสดงจำนวนสินค้าบน Badge ตะกร้า
+  // 2. คำนวณและแสดงจำนวนสินค้าบน Badge ตะกร้า
   async updateCartBadge() {
-    // ดักจับ Element ตัวเลขตะกร้าทุกรูปแบบที่มักใช้ใน HTML
     const badges = document.querySelectorAll("#cart-count, .cart-count, #cart-badge, .cart-badge");
     if (!badges || badges.length === 0) return;
 
@@ -96,11 +120,13 @@ class CartManager {
     const userId = currentUser ? (currentUser.id || currentUser.userId) : localStorage.getItem("userId");
 
     if (!userId) {
-      badges.forEach(b => b.textContent = "0");
+      badges.forEach(b => {
+        b.textContent = "0";
+      });
       return;
     }
 
-    // ดึงจำนวนจาก LocalStorage ก่อนเป็นอันดับแรก เพื่อให้แสดงผลทันทีแบบไม่หน่วง
+    // ดึงจาก LocalStorage ก่อน
     let localCart = [];
     try {
       localCart = JSON.parse(localStorage.getItem(`cart_${userId}`) || localStorage.getItem("cart") || "[]");
@@ -108,28 +134,31 @@ class CartManager {
       localCart = [];
     }
 
+    // กรองค่า null ออก
+    localCart = localCart.filter(item => item && (item.food_id || item.foodId || item.id) && Number(item.price) > 0);
     let totalCount = localCart.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+
     badges.forEach(b => {
       b.textContent = String(totalCount);
-      b.style.display = totalCount > 0 ? "inline-block" : "none";
     });
 
-    // พยายาม Sync จำนวนล่าสุดจาก Server ต่อ (ถ้ามี API รองรับ)
+    // ดึงจำนวนล่าสุดจากเซิร์ฟเวอร์
     try {
       const res = await fetch(`${this.baseUrl}/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         let items = Array.isArray(json) ? json : (json.data || json.items || []);
-        if (items.length > 0) {
-          const serverTotal = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 1), 0);
-          badges.forEach(b => {
-            b.textContent = String(serverTotal);
-            b.style.display = serverTotal > 0 ? "inline-block" : "none";
-          });
-        }
+        
+        // กรองเฉพาะรายการที่ถูกต้อง
+        items = items.filter(it => it && it.name && it.name !== "null" && Number(it.price) > 0);
+
+        const serverTotal = items.reduce((sum, item) => sum + Number(item.quantity || item.qty || 1), 0);
+        badges.forEach(b => {
+          b.textContent = String(serverTotal);
+        });
       }
     } catch (e) {
-      // หากติดต่อ Server ไม่ได้ ก็ยังคงใช้ตัวเลขจาก LocalStorage ที่แสดงไปแล้ว
+      // ใช้ออฟไลน์ fallback จาก LocalStorage
     }
   }
 
@@ -137,13 +166,19 @@ class CartManager {
   renderAuthNavbar() {
     const currentUser = this.getCurrentUser();
     const authLink = document.getElementById("authNav");
-    if (!authLink || !currentUser) return;
+    if (!authLink) return;
+
+    if (!currentUser) {
+      authLink.textContent = "เข้าสู่ระบบ";
+      authLink.href = "login.html";
+      return;
+    }
 
     const role = (currentUser.role || "").toLowerCase();
 
     if (role === "restaurant" || role === "merchant") {
       authLink.textContent = `🏪 ${currentUser.name} (ร้านค้า)`;
-      authLink.href = "restaurant.html";
+      authLink.href = "merchant.html";
     } else if (role === "rider") {
       authLink.textContent = `🛵 ${currentUser.name} (ไรเดอร์)`;
       authLink.href = "rider.html";
@@ -154,20 +189,21 @@ class CartManager {
         e.preventDefault();
         if (confirm("ต้องการออกจากระบบหรือไม่?")) {
           localStorage.clear();
-          window.location.reload();
+          sessionStorage.clear();
+          window.location.href = "login.html";
         }
       };
     }
   }
 }
 
-// สร้าง Instance และผูกเข้า Window
+// สร้าง Instance กลาง
 const cartManager = new CartManager();
 window.cartManager = cartManager;
 
-// ฟังก์ชัน Global สำหรับปุ่ม onclick ใน HTML
-function addToCart(name, price, image, restaurantId, foodId) {
-  cartManager.addToCart(name, price, image, restaurantId, foodId);
+// ฟังก์ชัน Global รองรับการเรียกจากทุกหน้า
+function addToCart(arg1, arg2, arg3, arg4, arg5) {
+  cartManager.addToCart(arg1, arg2, arg3, arg4, arg5);
 }
 
 // ฟังก์ชันค้นหาอาหาร
@@ -191,7 +227,7 @@ function searchFood() {
   }
 }
 
-// สั่งทำงานทันทีเมื่อหน้าเว็บโหลด
+// เริ่มต้นทำงานเมื่อหน้าเว็บพร้อม
 document.addEventListener("DOMContentLoaded", () => {
   cartManager.updateCartBadge();
   cartManager.renderAuthNavbar();

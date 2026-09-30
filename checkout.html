@@ -149,7 +149,7 @@
                 <label>ช่องทางการชำระเงิน</label>
                 <select id="paymentMethod" onchange="handlePaymentChange()">
                     <option value="wallet">💼 ชำระผ่านกระเป๋าเงิน (Wallet)</option>
-                    <option value="cash_on_delivery">💵 เก็บเงินปลายทาง (Cash on Delivery)</option>
+                    <option value="cash">💵 เก็บเงินปลายทาง (Cash on Delivery)</option>
                     <option value="promptpay">📱 โอนเงินผ่าน พร้อมเพย์ (PromptPay)</option>
                 </select>
 
@@ -176,7 +176,7 @@
     <script src="script.js"></script>
     <script>
         const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const userId = currentUser.id || localStorage.getItem("userId");
+        const userId = currentUser.id || currentUser.userId || localStorage.getItem("userId");
         let cartItems = [];
         let currentGrandTotal = 0;
         let customerBalance = 0;
@@ -261,15 +261,16 @@
             }
         }
 
+        // จับคู่ ID ร้านค้าให้ตรงกับมาตรฐานจริง 100%
         function resolveRestaurantId(foodId, existingRId) {
             const rId = Number(existingRId || 0);
             if (rId > 0) return rId;
 
             const fId = Number(foodId);
-            if (fId >= 18 && fId <= 21) return 1;      // ร้านกะเพราอร่อย
-            if (fId >= 4 && fId <= 6) return 2;        // Pizza House
-            if (fId >= 7 && fId <= 9) return 3;        // Burger Station
-            if (fId >= 11 && fId <= 13) return 4;      // ก๋วยเตี๋ยวเรือเจ้าอร่อย
+            if (fId >= 1 && fId <= 4) return 1;     // ร้านกะเพราอร่อย (ID: 1)
+            if (fId >= 8 && fId <= 10) return 2;    // Pizza House (ID: 2)
+            if (fId >= 5 && fId <= 7) return 3;     // Burger Station (ID: 3)
+            if (fId >= 11 && fId <= 13) return 4;   // ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)
             return 1;
         }
 
@@ -282,7 +283,10 @@
             try {
                 const res = await fetch(`/api/cart/${userId}?_t=${Date.now()}`, { cache: "no-store" });
                 const result = await res.json();
-                const rawItems = result.data || result.items || (Array.isArray(result) ? result : []);
+                let rawItems = result.data || result.items || (Array.isArray(result) ? result : []);
+
+                // ล้างค่า null หรือรายการขยะ
+                rawItems = rawItems.filter(it => it && (it.food_id || it.foodId || it.id) && Number(it.price || 0) > 0);
 
                 if (!rawItems || rawItems.length === 0) {
                     itemsContainer.innerHTML = "<p style='color:#dc3545;'>ไม่มีสินค้าในตะกร้า</p>";
@@ -365,7 +369,7 @@
             }
 
             btnSubmit.disabled = true;
-            btnSubmit.innerText = "⏳ กำลังบันทึกคำสั่งซื้อและตัดเงิน...";
+            btnSubmit.innerText = "⏳ กำลังบันทึกคำสั่งซื้อ...";
 
             try {
                 const storeGroups = {};
@@ -414,13 +418,16 @@
                 }
 
                 if (createdOrderIds.length > 0) {
+                    // ล้างตะกร้าหลังสั่งสำเร็จ
                     await fetch(`/api/cart/${userId}`, { method: "DELETE" });
+                    localStorage.removeItem(`cart_${userId}`);
+                    localStorage.removeItem("cart");
 
                     if (window.cartManager) {
                         await window.cartManager.updateCartBadge();
                     }
 
-                    alert(`🎉 สั่งซื้อและชำระเงินสำเร็จ! (แยกคำสั่งซื้อตามร้านทั้งหมด ${createdOrderIds.length} รายการ)`);
+                    alert(`🎉 สั่งซื้อสำเร็จ! (สร้างคำสั่งซื้อทั้งหมด ${createdOrderIds.length} รายการ)`);
 
                     if (createdOrderIds.length === 1) {
                         window.location.href = `order.html?orderId=${createdOrderIds[0]}`;
