@@ -6,6 +6,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>สมัครสมาชิก | BestFood Delivery</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .register-card {
+            max-width: 420px;
+            margin: 40px auto;
+            padding: 28px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        .form-item {
+            margin-bottom: 16px;
+        }
+        .form-item label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+        }
+        .form-item input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+        .btn-register {
+            width: 100%;
+            padding: 12px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-register:hover {
+            background: #059669;
+        }
+        .btn-register:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 
 <body>
@@ -23,37 +70,37 @@
         </div>
     </header>
 
-    <main style="max-width: 400px; margin: 40px auto; padding: 20px; background: white; border-radius: 8px;">
-        <h2>สมัครสมาชิก</h2>
+    <main class="register-card">
+        <h2 style="margin-top: 0; margin-bottom: 20px;">สมัครสมาชิก</h2>
 
         <form id="register-form">
-            <div>
-                <label for="name">ชื่อ</label><br>
-                <input type="text" id="name" required placeholder="กรอกชื่อ" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <div class="form-item">
+                <label for="name">ชื่อผู้ใช้งาน</label>
+                <input type="text" id="name" required placeholder="กรอกชื่อ-นามสกุล">
             </div>
-            <br>
-            <div>
-                <label for="email">Email</label><br>
-                <input type="email" id="email" required placeholder="กรอก Email" style="width: 100%; padding: 8px; margin-top: 5px;">
+
+            <div class="form-item">
+                <label for="email">อีเมล (Email)</label>
+                <input type="email" id="email" required placeholder="example@email.com">
             </div>
-            <br>
-            <div>
-                <label for="password">Password</label><br>
-                <input type="password" id="password" required placeholder="กรอกรหัสผ่าน" style="width: 100%; padding: 8px; margin-top: 5px;">
+
+            <div class="form-item">
+                <label for="password">รหัสผ่าน (Password)</label>
+                <input type="password" id="password" required placeholder="กรอกรหัสผ่านอย่างน้อย 4 ตัวอักษร">
             </div>
-            <br>
-            <div>
-                <label for="confirm-password">ยืนยัน Password</label><br>
-                <input type="password" id="confirm-password" required placeholder="กรอกรหัสผ่านอีกครั้ง" style="width: 100%; padding: 8px; margin-top: 5px;">
+
+            <div class="form-item">
+                <label for="confirm-password">ยืนยันรหัสผ่านอีกครั้ง</label>
+                <input type="password" id="confirm-password" required placeholder="กรอกรหัสผ่านอีกครั้ง">
             </div>
-            <br>
-            <button type="submit" style="width: 100%; padding: 10px; background: #e53935; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+
+            <button type="submit" id="btnSubmit" class="btn-register">
                 สมัครสมาชิก
             </button>
         </form>
 
-        <p style="margin-top: 15px; text-align: center;">
-            มีบัญชีอยู่แล้ว? <a href="login.html">เข้าสู่ระบบ</a>
+        <p style="margin-top: 20px; text-align: center; font-size: 14px; color: #666;">
+            มีบัญชีอยู่แล้ว? <a href="login.html" style="color: #10b981; font-weight: bold; text-decoration: none;">เข้าสู่ระบบ</a>
         </p>
     </main>
 
@@ -64,22 +111,30 @@
     <script src="script.js"></script>
     <script>
         const registerForm = document.getElementById("register-form");
+        const btnSubmit = document.getElementById("btnSubmit");
 
         registerForm.addEventListener("submit", async function (e) {
             e.preventDefault();
 
             const name = document.getElementById("name").value.trim();
-            const email = document.getElementById("email").value.trim();
+            const email = document.getElementById("email").value.trim().toLowerCase();
             const password = document.getElementById("password").value;
             const confirmPassword = document.getElementById("confirm-password").value;
 
-            if (password !== confirmPassword) {
-                alert("รหัสผ่านไม่ตรงกัน กรุณากรอกใหม่");
+            if (password.length < 4) {
+                alert("กรุณาตั้งรหัสผ่านอย่างน้อย 4 ตัวอักษร");
                 return;
             }
 
+            if (password !== confirmPassword) {
+                alert("รหัสผ่านไม่ตรงกัน กรุณากรอกใหม่อีกครั้ง");
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "⏳ กำลังสมัครสมาชิก...";
+
             try {
-                // แก้ไขเป็น /api/register เพื่อเรียก API ได้โดยตรงทั้งบน Render และ Local
                 const response = await fetch("/api/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -90,15 +145,19 @@
 
                 if (!response.ok || !data.success) {
                     alert(data.message || "เกิดข้อผิดพลาดในการสมัครสมาชิก");
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerText = "สมัครสมาชิก";
                     return;
                 }
 
-                alert("สมัครสมาชิกสำเร็จ 🎉");
+                alert("สมัครสมาชิกสำเร็จ 🎉 กรุณาเข้าสู่ระบบ");
                 window.location.href = "login.html";
 
             } catch (error) {
                 console.error("Register Error:", error);
                 alert("ไม่สามารถเชื่อมต่อกับ Server ได้ กรุณาลองใหม่อีกครั้ง");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "สมัครสมาชิก";
             }
         });
     </script>

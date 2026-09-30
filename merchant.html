@@ -292,6 +292,20 @@
     </div>
 
     <script>
+        const storeProfiles = {
+            1: { name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1 กทม." },
+            2: { name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
+            3: { name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
+            4: { name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
+        };
+
+        const fallbackMenuCatalog = {
+            1: "ข้าวกะเพราหมูสับ", 2: "ข้าวกะเพราไก่", 3: "ข้าวกะเพราเนื้อ", 4: "ไข่ดาว",
+            5: "Pizza Margherita", 6: "Pizza Hawaiian", 7: "Pepperoni Pizza",
+            8: "Classic Burger", 9: "Cheese Burger", 10: "Chicken Burger",
+            11: "ก๋วยเตี๋ยวต้มยำ", 12: "ก๋วยเตี๋ยวหมู", 13: "ก๋วยเตี๋ยวเนื้อ"
+        };
+
         let rawUser = localStorage.getItem('currentUser') || localStorage.getItem('user') || '{}';
         let currentUser = JSON.parse(rawUser);
         const userRole = (currentUser.role || '').toLowerCase();
@@ -306,11 +320,8 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        // ตรวจจับ ID ร้านค้าจากชื่อบัญชีและคีย์ของ User ให้แม่นยำ 100%
+        // จับคู่ ID ร้านค้าจากชื่อบัญชีและอีเมลเป็นหลัก เพื่อป้องกันการดึงผิดร้าน
         function detectStoreId(user) {
-            if (user.restaurant_id && Number(user.restaurant_id) > 0) {
-                return Number(user.restaurant_id);
-            }
             const name = String(user.name || '').toLowerCase();
             const email = String(user.email || '').toLowerCase();
             
@@ -318,6 +329,10 @@
             if (name.includes('burger') || email.includes('burger')) return 3;
             if (name.includes('noodle') || name.includes('เตี๋ยว') || email.includes('noodle')) return 4;
             if (name.includes('กะเพรา') || name.includes('kapao') || email.includes('kapao')) return 1;
+
+            if (user.restaurant_id && Number(user.restaurant_id) > 0) {
+                return Number(user.restaurant_id);
+            }
             
             return Number(user.id || 1);
         }
@@ -325,17 +340,7 @@
         let currentStoreId = detectStoreId(currentUser);
 
         async function initMerchant() {
-            try {
-                const uRes = await fetch('/api/users/' + currentUser.id);
-                if (uRes.ok) {
-                    const uData = await uRes.json();
-                    if (uData.user && uData.user.restaurant_id) {
-                        currentStoreId = Number(uData.user.restaurant_id);
-                    }
-                }
-            } catch(e) {}
-
-            currentStoreId = detectStoreId({ ...currentUser, restaurant_id: currentStoreId });
+            currentStoreId = detectStoreId(currentUser);
             currentUser.restaurant_id = currentStoreId;
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
             localStorage.setItem('user', JSON.stringify(currentUser));
@@ -366,8 +371,10 @@
                 console.error("Store dropdown error:", err);
             }
 
-            const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || allStores.find(s => s.name.toLowerCase().includes('pizza')) || allStores[0];
-            currentStoreId = myStore.id;
+            const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || 
+                            storeProfiles[currentStoreId] || 
+                            allStores[0];
+            currentStoreId = myStore.id || currentStoreId;
 
             if (userRole === 'admin') {
                 select.disabled = false;
@@ -376,7 +383,7 @@
                     return '<option value="' + s.id + '" ' + isSelected + '>' + s.name + ' (ID: ' + s.id + ')</option>';
                 }).join('');
             } else {
-                select.innerHTML = '<option value="' + myStore.id + '" selected>🔒 ' + myStore.name + ' (ร้านของคุณ)</option>';
+                select.innerHTML = '<option value="' + currentStoreId + '" selected>🔒 ' + (myStore.name || 'ร้านของคุณ') + ' (ร้านของคุณ)</option>';
                 select.disabled = true;
             }
 
@@ -385,9 +392,10 @@
         }
 
         function updateProfileCard(store) {
-            document.getElementById('storeProfileName').innerText = '🏪 ' + (store.name || 'ร้านอาหาร');
-            document.getElementById('storeProfilePhone').innerText = store.phone || '082-222-2222';
-            document.getElementById('storeProfileAddress').innerText = store.address || 'กรุงเทพมหานคร';
+            const prof = storeProfiles[currentStoreId] || store;
+            document.getElementById('storeProfileName').innerText = '🏪 ' + (prof.name || 'ร้านอาหาร');
+            document.getElementById('storeProfilePhone').innerText = prof.phone || '082-222-2222';
+            document.getElementById('storeProfileAddress').innerText = prof.address || 'กรุงเทพมหานคร';
         }
 
         function onSelectStore() {
@@ -411,12 +419,13 @@
                 container.innerHTML = orders.map(function(ord) {
                     const items = ord.items || [];
                     const timeStr = ord.created_at ? new Date(ord.created_at).toLocaleTimeString('th-TH') : '-';
-                    const paymentText = ord.payment_method === 'cash_on_delivery' 
+                    const paymentText = String(ord.payment_method || '').includes('cash')
                         ? '💵 เก็บเงินปลายทาง (COD)' 
-                        : '📱 โอนเงิน / พร้อมเพย์ / Wallet';
+                        : (String(ord.payment_method || '') === 'wallet' ? '💼 ชำระผ่านกระเป๋าเงิน (Wallet)' : '📱 โอนเงิน / พร้อมเพย์');
 
                     const itemsHtml = items.map(function(it) {
-                        const fName = it.food_name || it.name || 'อาหาร';
+                        const fid = Number(it.food_id || it.id);
+                        const fName = it.food_name || it.name || fallbackMenuCatalog[fid] || `อาหารรหัส #${fid}`;
                         const qty = Number(it.quantity) || 1;
                         const subTotal = (Number(it.price || 0) * qty).toLocaleString();
                         return '<div class="item-list-row"><span>• ' + fName + ' × ' + qty + '</span><span>' + subTotal + ' บาท</span></div>';
@@ -454,6 +463,7 @@
                 case 'ready': return '📦 รอไรเดอร์มารับ';
                 case 'delivering': return '🛵 ไรเดอร์กำลังนำส่ง';
                 case 'completed': return '🎉 จัดส่งสำเร็จ';
+                case 'cancelled': return '❌ ยกเลิกแล้ว';
                 default: return status;
             }
         }
@@ -491,7 +501,7 @@
         }
 
         async function loadWalletBalance() {
-            const targetUserId = currentUser.id || currentUser.restaurant_id;
+            const targetUserId = currentUser.id || currentStoreId;
             if (!targetUserId) return;
             try {
                 const res = await fetch('/api/wallet/' + targetUserId + '?_t=' + Date.now(), { cache: 'no-store' });
@@ -532,7 +542,7 @@
             }
 
             try {
-                const targetUserId = currentUser.id || currentUser.restaurant_id;
+                const targetUserId = currentUser.id || currentStoreId;
                 const res = await fetch('/api/wallet/withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
