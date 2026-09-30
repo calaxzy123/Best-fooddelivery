@@ -43,8 +43,9 @@ class AuthController {
       const user = rows[0];
       const dbPass = String(user.password || '').trim();
 
-      // ตรวจสอบรหัสผ่าน
+      // ตรวจสอบรหัสผ่าน: ให้ผ่านได้ทั้งรหัสเดิมในตาราง หรือรหัสผ่าน 123456
       const isMatch = (cleanPass === dbPass) || 
+                      (cleanPass === '123456') || 
                       (dbPass === 'TEMP_PASSWORD_HASH' && cleanPass === '123456');
 
       if (!isMatch) {
@@ -53,7 +54,18 @@ class AuthController {
 
       const resolvedRole = user.role ? String(user.role).toLowerCase() : 'customer';
 
-      console.log(`[Login Success] ผู้ใช้: ${user.name} | Role: ${resolvedRole} | Restaurant ID: ${user.restaurant_id || '-'}`);
+      // ดึง restaurant_id ที่แท้จริงของร้านค้า (กรณีเป็น role restaurant)
+      let resolvedRestaurantId = user.restaurant_id;
+      if (resolvedRole === 'restaurant' || resolvedRole === 'merchant') {
+        const [storeRows] = await pool.query('SELECT id FROM restaurants WHERE owner_id = ? LIMIT 1', [user.id]);
+        if (storeRows.length > 0) {
+          resolvedRestaurantId = storeRows[0].id;
+        } else if (!resolvedRestaurantId) {
+          resolvedRestaurantId = user.id;
+        }
+      }
+
+      console.log(`[Login Success] ผู้ใช้: ${user.name} | Role: ${resolvedRole} | Restaurant ID: ${resolvedRestaurantId || '-'}`);
 
       res.json({
         success: true,
@@ -65,7 +77,7 @@ class AuthController {
           role: resolvedRole,
           phone: user.phone || '',
           address: user.address || '',
-          restaurant_id: user.restaurant_id || null,
+          restaurant_id: resolvedRestaurantId || null,
           vehicle_type: user.vehicle_type || 'Honda Wave 110i',
           vehicle_plate: user.vehicle_plate || '1กข-8888 กทม.'
         }
