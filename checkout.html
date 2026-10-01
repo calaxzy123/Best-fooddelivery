@@ -198,7 +198,6 @@
         let currentGrandTotal = 0;
         let customerBalance = 0;
 
-        // เช็กสถานะการล็อกอิน
         if (!userId) {
             alert("กรุณาเข้าสู่ระบบก่อนทำรายการสั่งซื้อ");
             window.location.href = "login.html";
@@ -208,7 +207,6 @@
             loadCheckoutSummary();
         }
 
-        // โหลดข้อมูลกระเป๋าเงินลูกค้า
         async function loadCustomerWalletData() {
             try {
                 const res = await fetch(`/api/wallet/${userId}?_t=${Date.now()}`);
@@ -223,7 +221,6 @@
             }
         }
 
-        // เมื่อสลับวิธีชำระเงิน
         function handlePaymentChange() {
             const payment = document.getElementById("paymentMethod").value;
             const walletBadge = document.getElementById("walletBadge");
@@ -250,7 +247,6 @@
             }
         }
 
-        // ปุ่มเติมเงินด่วน
         async function quickTopup() {
             const input = prompt("ระบุจำนวนเงินที่ต้องการเติมเข้ากระเป๋า (บาท):", "200");
             if (input === null) return;
@@ -278,7 +274,6 @@
             }
         }
 
-        // ระบุ ID ร้านค้าที่ถูกต้องตามกลุ่มอาหาร 100%
         function resolveRestaurantId(foodId, existingRId) {
             const fId = Number(foodId);
             if (fallbackMenuCatalog[fId]) {
@@ -302,7 +297,6 @@
                 const result = await res.json();
                 let rawItems = result.data || result.items || (Array.isArray(result) ? result : []);
 
-                // ล้างค่า null หรือรายการขยะ
                 rawItems = rawItems.filter(it => it && (it.food_id || it.foodId || it.id) && Number(it.price || 0) > 0);
 
                 if (!rawItems || rawItems.length === 0) {
@@ -369,6 +363,8 @@
             }
         }
 
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
         async function submitOrder(e) {
             e.preventDefault();
             if (cartItems.length === 0) {
@@ -400,7 +396,10 @@
                 });
 
                 const createdOrderIds = [];
-                for (const [rId, items] of Object.entries(storeGroups)) {
+                const storeEntries = Object.entries(storeGroups);
+
+                for (let index = 0; index < storeEntries.length; index++) {
+                    const [rId, items] = storeEntries[index];
                     const storeSubtotal = items.reduce((sum, it) => sum + (it.price * it.quantity), 0);
                     const storeGrandTotal = storeSubtotal + 20;
 
@@ -418,6 +417,8 @@
                         }))
                     };
 
+                    btnSubmit.innerText = `⏳ กำลังบันทึกร้านที่ ${index + 1}/${storeEntries.length}...`;
+
                     const res = await fetch("/api/orders", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -428,23 +429,24 @@
                     if (result.success && result.orderId) {
                         createdOrderIds.push(result.orderId);
                     } else {
-                        alert(result.message || "เกิดข้อผิดพลาดในการบันทึกคำสั่งซื้อ");
-                        btnSubmit.disabled = false;
-                        btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ";
-                        return;
+                        throw new Error(result.message || `เกิดข้อผิดพลาดในการบันทึกออเดอร์ร้านรหัส #${rId}`);
+                    }
+
+                    // หน่วงเวลา 250ms เพื่อป้องกัน Database Connection แย่ง Row Lock
+                    if (index < storeEntries.length - 1) {
+                        await delay(250);
                     }
                 }
 
                 if (createdOrderIds.length > 0) {
-                    // ล้างตะกร้าหลังสั่งสำเร็จ
-                    await fetch(`/api/cart/${userId}`, { method: "DELETE" });
+                    await fetch(`/api/cart/${userId}`, { method: "DELETE" }).catch(() => {});
                     localStorage.removeItem(`cart_${userId}`);
                     localStorage.removeItem("cart");
 
                     const badge = document.getElementById("cart-count");
                     if (badge) badge.textContent = "0";
 
-                    alert(`🎉 สั่งซื้อสำเร็จ! (สร้างคำสั่งซื้อทั้งหมด ${createdOrderIds.length} รายการ)`);
+                    alert(`🎉 สั่งซื้อสำเร็จ! (สร้างคำสั่งซื้อทั้งหมด ${createdOrderIds.length} ร้าน)`);
 
                     if (createdOrderIds.length === 1) {
                         window.location.href = `order.html?orderId=${createdOrderIds[0]}`;
@@ -455,9 +457,9 @@
 
             } catch (err) {
                 console.error("Order Submit Error:", err);
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+                alert(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
                 btnSubmit.disabled = false;
-                btnSubmit.innerText = "✅ ยืนยันการสั่งซื้อ";
+                handlePaymentChange();
             }
         }
     </script>
