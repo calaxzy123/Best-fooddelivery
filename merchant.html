@@ -232,10 +232,10 @@
             </span>
         </section>
 
-        <!-- แถบยอดเงินสะสมในระบบ (Wallet Balance) -->
+        <!-- แถบยอดเงินสะสมในระบบ (Merchant Wallet Balance) -->
         <section class="wallet-card">
             <div>
-                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ยอดเงินสะสมในกระเป๋าของร้านนี้ (หัก GP 15% อัตโนมัติเมื่อจัดส่งสำเร็จ)</span>
+                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ยอดเงินสะสมของร้านนี้ (หัก GP 15% อัตโนมัติเมื่อจัดส่งสำเร็จ)</span>
                 <h2 style="margin: 6px 0 0 0; color: #0f172a; font-size: 2.1rem; letter-spacing: -0.5px;">฿<span id="walletBalance">0.00</span></h2>
             </div>
             <div>
@@ -321,14 +321,14 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        // ดึงค่าร้านที่เลือกไว้ในหน้านี้ (ถ้ายังไม่มี ให้ยึดจาก restaurant_id ของ user หรือ 1)
+        // ค่าเริ่มต้นร้านค้าที่กำลังจัดการ (1: กะเพรา, 2: Pizza, 3: Burger, 4: ก๋วยเตี๋ยว)
         let currentStoreId = Number(localStorage.getItem('activeStoreView') || currentUser.restaurant_id || 1);
         if (currentStoreId < 1 || currentStoreId > 4) currentStoreId = 1;
 
         async function initMerchant() {
             const select = document.getElementById('restaurantSelect');
             if (select) {
-                select.disabled = false; // ปลดล็อกให้สลับดูและถอนเงินได้ทุกร้าน
+                select.disabled = false;
                 select.value = String(currentStoreId);
             }
             updateProfileCard();
@@ -349,7 +349,7 @@
             localStorage.setItem('activeStoreView', currentStoreId);
             updateProfileCard();
             loadOrders();
-            loadWalletBalance(); // รีเฟรชยอดเงินของร้านที่เลือกทันที
+            loadWalletBalance(); // รีเฟรชยอดเงินให้ตรงกับร้านที่เลือกทันที
         }
 
         async function loadOrders() {
@@ -448,10 +448,10 @@
             }
         }
 
-        // ดึงยอดเงินเฉพาะร้าน currentStoreId เท่านั้น
+        // ดึงยอดเงินของร้านที่เลือกโดยตรงผ่าน /api/merchant/wallet/:storeId
         async function loadWalletBalance() {
             try {
-                const res = await fetch('/api/wallet/' + currentStoreId + '?_t=' + Date.now(), { cache: 'no-store' });
+                const res = await fetch('/api/merchant/wallet/' + currentStoreId + '?_t=' + Date.now(), { cache: 'no-store' });
                 const data = await res.json();
                 if (data.success) {
                     const balanceEl = document.getElementById('walletBalance');
@@ -467,7 +467,7 @@
             }
         }
 
-        // ถอนเงินออกจากร้านที่กำลังเปิดดูอยู่เท่านั้น (currentStoreId)
+        // ถอนเงินออกจากกระเป๋าของร้านที่กำลังเปิดดูอยู่เท่านั้น (currentStoreId)
         async function requestWithdrawal() {
             const balanceEl = document.getElementById('walletBalance');
             const currentBalance = parseFloat(balanceEl?.textContent.replace(/,/g, '') || '0');
@@ -511,11 +511,11 @@
             if (!confirmWithdraw) return;
 
             try {
-                const res = await fetch('/api/wallet/withdraw', {
+                const res = await fetch('/api/merchant/wallet/withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        userId: Number(currentStoreId), // ส่ง ID ของร้านที่เลือกตรงๆ เสมอ
+                        storeId: Number(currentStoreId),
                         amount: amount,
                         bank_name: bankName,
                         account_no: bankAccount

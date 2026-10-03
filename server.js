@@ -19,6 +19,14 @@ const orderRepo = new OrderRepository();
 
 const orderLiveLocations = {};
 
+// ดึงหรือสร้างกระเป๋าเงินผู้ใช้งาน (ลูกค้า/ไรเดอร์) คืน id จริงเสมอ
+async function getUserWallet(pool, userId) {
+  const uid = Number(userId);
+  await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [uid]);
+  const [rows] = await pool.query('SELECT id, user_id, balance FROM wallets WHERE user_id = ? LIMIT 1', [uid]);
+  return rows[0];
+}
+
 // ----------------------------------------------------
 // ระบบเตรียมตารางฐานข้อมูลอัตโนมัติ (แยกตารางเด็ดขาด 100%)
 // ----------------------------------------------------
@@ -130,15 +138,11 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // ปลดล็อก Foreign Key Constraint ที่ค้างอยู่ (ถ้ามี)
-    try {
-      await pool.query(`ALTER TABLE wallet_transactions DROP FOREIGN KEY wallet_transactions_ibfk_1`);
-    } catch (e) {}
-    try {
-      await pool.query(`ALTER TABLE wallet_transactions DROP FOREIGN KEY fk_wallet_ref`);
-    } catch (e) {}
+    // ปลดล็อก Foreign Key Constraints เก่าที่ค้างอยู่
+    try { await pool.query(`ALTER TABLE wallet_transactions DROP FOREIGN KEY wallet_transactions_ibfk_1`); } catch (e) {}
+    try { await pool.query(`ALTER TABLE wallet_transactions DROP FOREIGN KEY fk_wallet_ref`); } catch (e) {}
 
-    // 9. ตารางกระเป๋าเงินร้านค้าแยกต่างหากเด็ดขาด (Merchant Wallets)
+    // 9. ตารางกระเป๋าเงินร้านค้าแยกต่างหาก 100% (Merchant Wallets)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS merchant_wallets (
         restaurant_id INT PRIMARY KEY,
@@ -147,12 +151,11 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // สร้างกระเป๋าร้านค้าทั้ง 4 ร้านให้พร้อม
+    // เตรียมกระเป๋าร้านค้าทั้ง 4 ร้านให้พร้อม
     for (let sId = 1; sId <= 4; sId++) {
       await pool.query('INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)', [sId]);
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [sId]);
     }
-    await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [5]);
 
     // --- AUTO-SEED ร้านค้าหลัก 4 ร้าน ---
     await pool.query(`
@@ -190,14 +193,14 @@ async function initializeDatabaseTables() {
         image = VALUES(image);
     `);
 
-    console.log('✅ [Database] โครงสร้างตารางแยกกระเป๋าเงินเด็ดขาด 100%');
+    console.log('✅ [Database] โครงสร้างตารางแยกขาดสมบูรณ์ 100%');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
 }
 
 // ----------------------------------------------------
-// จัดสรรเงินคำสั่งซื้อเมื่อส่งสำเร็จ (ร้านใครร้านมัน 100%)
+// จัดสรรเงินคำสั่งซื้อเมื่อส่งสำเร็จ (ร้านใครร้านมัน + เงินเข้าไรเดอร์ตรงเป๊ะ)
 // ----------------------------------------------------
 async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
@@ -228,7 +231,6 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     }
 
     const merchantNet = Number((foodSubtotal * 0.85).toFixed(2)); // หัก GP 15%
-    const deliveryFee = 20.00;
 
     // 1. โอนเงินให้ร้านค้านั้นๆ เข้า merchant_wallets ตรงๆ
     const [existingShop] = await pool.query(
@@ -252,33 +254,27 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
       console.log(`💰 [Shop Paid] คำสั่งซื้อ #${oId}: ร้าน #${restId} ได้รับ ฿${merchantNet}`);
     }
 
-    // 2. โอนเงินให้ไรเดอร์ (20 บาท) เข้าตาราง wallets ปกติ
-    let riderUid = explicitRiderId || order.rider_id;
-    if (!riderUid || Number(riderUid) <= 4) {
-      const [rUser] = await pool.query('SELECT id FROM users WHERE role = "rider" ORDER BY id ASC LIMIT 1');
-      riderUid = rUser.length > 0 ? rUser[0].id : 5;
-    }
+    // 2. โอนเงินให้ไรเดอร์ (20 บาท) เข้ากระเป๋า wallets ของไรเดอร์คนนั้นตรงๆ
+    const riderIdToPay = Number(explicitRiderId || order.rider_id);
 
-    const [existingRider] = await pool.query(
-      `SELECT id FROM wallet_transactions WHERE order_id = ? AND wallet_id = ? AND type = 'delivery_fee' LIMIT 1`,
-      [oId, riderUid]
-    );
-
-    if (!existingRider.length && riderUid) {
-      await pool.query('UPDATE orders SET rider_id = ? WHERE id = ?', [riderUid, oId]);
-      await pool.query(
-        `INSERT INTO wallets (user_id, balance) VALUES (?, 20.00)
-         ON DUPLICATE KEY UPDATE balance = balance + 20.00`,
-        [riderUid]
+    if (riderIdToPay > 0) {
+      const [existingRider] = await pool.query(
+        `SELECT id FROM wallet_transactions WHERE order_id = ? AND type = 'delivery_fee' LIMIT 1`,
+        [oId]
       );
 
-      await pool.query(
-        `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
-         VALUES (?, ?, 20.00, 'delivery_fee', ?)`,
-        [riderUid, oId, `ค่ารอบจัดส่งคำสั่งซื้อ #${oId}`]
-      );
+      if (!existingRider.length) {
+        const rWallet = await getUserWallet(pool, riderIdToPay);
+        await pool.query(`UPDATE wallets SET balance = balance + 20.00 WHERE id = ?`, [rWallet.id]);
 
-      console.log(`🛵 [Rider Paid] คำสั่งซื้อ #${oId}: ไรเดอร์ User ID #${riderUid} ได้รับ ฿20.00`);
+        await pool.query(
+          `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
+           VALUES (?, ?, 20.00, 'delivery_fee', ?)`,
+          [rWallet.id, oId, `ค่ารอบจัดส่งคำสั่งซื้อ #${oId}`]
+        );
+
+        console.log(`🛵 [Rider Paid] คำสั่งซื้อ #${oId}: ไรเดอร์ User ID #${riderIdToPay} ได้รับ ฿20.00`);
+      }
     }
 
   } catch (error) {
@@ -289,7 +285,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
 // เช็กสถานะเซิร์ฟเวอร์
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
-// ล้างคำสั่งซื้อทั้งหมดให้เริ่มระบบใหม่ สะอาด 100%
+// ล้างคำสั่งซื้อทั้งหมด + กระเป๋าเงินทุกร้านเป็น 0.00 สะอาดหมดจด
 app.get('/api/admin/reset-orders', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -303,8 +299,8 @@ app.get('/api/admin/reset-orders', async (req, res) => {
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1 style="color: #10b981;">✅ ล้างข้อมูลทั้งหมดสะอาดหมดจด 100% แล้ว!</h1>
-        <p>ยอดเงินทุกร้านเป็น 0.00 และออเดอร์เก่าถูกลบหมดแล้ว</p>
-        <a href="/order.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: bold;">ไปสั่งอาหารใหม่</a>
+        <p>ยอดเงินร้านกะเพรา พิซซ่า เบอร์เกอร์ ก๋วยเตี๋ยว และไรเดอร์ ถูกรีเซ็ตเป็น ฿0.00 เรียบร้อย</p>
+        <a href="/merchant.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: bold;">กลับไปแดชบอร์ดร้านค้า</a>
       </div>
     `);
   } catch (err) {
@@ -321,13 +317,13 @@ app.get('/api/admin/reset-wallets-audit', async (req, res) => {
     await pool.query("DELETE FROM wallet_transactions");
 
     const [doneOrders] = await pool.query(`
-      SELECT id FROM orders 
+      SELECT id, rider_id FROM orders 
       WHERE status IN ('completed', 'delivered', 'done', 'จัดส่งสำเร็จ')
       ORDER BY id ASC
     `);
 
     for (const ord of doneOrders) {
-      await processOrderPayout(ord.id);
+      await processOrderPayout(ord.id, ord.rider_id);
     }
 
     const [merchants] = await pool.query(`
@@ -363,6 +359,236 @@ app.get('/api/admin/reset-wallets-audit', async (req, res) => {
     res.status(500).send('เกิดข้อผิดพลาด: ' + err.message);
   }
 });
+
+// ----------------------------------------------------
+// ระบบกระเป๋าเงินร้านค้าโดยเฉพาะ (Merchant Wallet)
+// ----------------------------------------------------
+app.get('/api/merchant/wallet/:storeId', async (req, res) => {
+  try {
+    const pool = db.getPool();
+    const storeId = Number(req.params.storeId);
+    await pool.query(`INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)`, [storeId]);
+    const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [storeId]);
+    const currentBalance = mw.length > 0 ? Number(mw[0].balance || 0).toFixed(2) : "0.00";
+
+    const [txs] = await pool.query(
+      `SELECT * FROM wallet_transactions WHERE wallet_id = ? AND type LIKE 'merchant_%' ORDER BY created_at DESC LIMIT 20`,
+      [storeId]
+    );
+
+    res.json({ success: true, balance: currentBalance, transactions: txs });
+  } catch (err) {
+    console.error('Fetch Merchant Wallet Error:', err.message);
+    res.json({ success: true, balance: "0.00", transactions: [] });
+  }
+});
+
+app.post('/api/merchant/wallet/withdraw', async (req, res) => {
+  const pool = db.getPool();
+  try {
+    const { storeId, amount, bank_name, account_no } = req.body;
+    const withdrawAmount = Number(amount);
+    const targetStoreId = Number(storeId);
+
+    if (!targetStoreId || isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุจำนวนเงินที่ถูกต้อง' });
+    }
+
+    const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetStoreId]);
+    const currentBal = mw.length > 0 ? Number(mw[0].balance || 0) : 0;
+
+    if (currentBal < withdrawAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `ยอดเงินคงเหลือไม่เพียงพอสำหรับการถอน (คงเหลือ: ฿${currentBal.toFixed(2)})`
+      });
+    }
+
+    // ตัดเงินเฉพาะร้านที่เลือก 100%
+    await pool.query(`UPDATE merchant_wallets SET balance = balance - ? WHERE restaurant_id = ?`, [withdrawAmount, targetStoreId]);
+
+    const bankDesc = bank_name && account_no 
+      ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
+      : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
+
+    await pool.query(
+      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+       VALUES (?, ?, 'merchant_withdraw', ?)`,
+      [targetStoreId, -withdrawAmount, bankDesc]
+    );
+
+    console.log(`💸 [Merchant Withdraw] ร้าน #${targetStoreId} ถอนเงินสำเร็จ: ฿${withdrawAmount}`);
+
+    res.json({ 
+      success: true, 
+      message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว` 
+    });
+  } catch (err) {
+    console.error('Merchant Withdraw Error:', err);
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด: ' + err.message });
+  }
+});
+
+// ----------------------------------------------------
+// ระบบกระเป๋าเงินผู้ใช้ทั่วไป (ลูกค้า & ไรเดอร์)
+// ----------------------------------------------------
+const handleWalletFetch = async (req, res) => {
+  try {
+    const pool = db.getPool();
+    const targetId = Number(req.params.userId);
+    const referer = req.headers['referer'] || '';
+
+    // หากเรียกมาจากหน้า merchant.html ให้สลับไปดึงยอดร้านค้า
+    if (referer.includes('merchant.html') && targetId >= 1 && targetId <= 4) {
+      await pool.query(`INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)`, [targetId]);
+      const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
+      const currentBalance = mw.length > 0 ? Number(mw[0].balance || 0).toFixed(2) : "0.00";
+
+      const [txs] = await pool.query(
+        `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
+        [targetId]
+      );
+      return res.json({ success: true, balance: currentBalance, transactions: txs });
+    }
+
+    // ลูกค้า และ ไรเดอร์ ให้ดึงจากตาราง wallets ของ user_id คนนั้น
+    const uWallet = await getUserWallet(pool, targetId);
+
+    const [txs] = await pool.query(
+      `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
+      [uWallet.id]
+    );
+
+    res.json({ success: true, balance: Number(uWallet.balance || 0).toFixed(2), transactions: txs });
+  } catch (err) {
+    console.error('Fetch Wallet Error:', err.message);
+    res.json({ success: true, balance: "0.00", transactions: [] });
+  }
+};
+
+app.get('/api/wallet/:userId', handleWalletFetch);
+app.get('/wallet/:userId', handleWalletFetch);
+
+// เติมเงินเข้ากระเป๋าลูกค้า (เข้าตาราง wallets ตรงๆ 100%)
+const handleWalletTopup = async (req, res) => {
+  const pool = db.getPool();
+  try {
+    const { userId, amount } = req.body;
+    const topupAmount = Number(amount);
+    const uid = Number(userId);
+
+    if (!uid || isNaN(topupAmount) || topupAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'จำนวนเงินเติมไม่ถูกต้อง' });
+    }
+
+    const uWallet = await getUserWallet(pool, uid);
+
+    // เพิ่มเงินเข้ากระเป๋า wallets ของลูกค้า
+    await pool.query(
+      `UPDATE wallets SET balance = balance + ? WHERE id = ?`,
+      [topupAmount, uWallet.id]
+    );
+
+    // บันทึกประวัติ
+    await pool.query(
+      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+       VALUES (?, ?, 'topup', ?)`,
+      [uWallet.id, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
+    );
+
+    console.log(`💳 [Topup Success] User #${uid} เติมเงินสำเร็จ ฿${topupAmount}`);
+    res.json({ success: true, message: `เติมเงินสำเร็จ ฿${topupAmount.toFixed(2)}` });
+  } catch (err) {
+    console.error('Topup Error:', err);
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการเติมเงิน: ' + err.message });
+  }
+};
+
+app.post('/api/wallet/topup', handleWalletTopup);
+app.post('/wallet/topup', handleWalletTopup);
+
+// ถอนเงินออกจากกระเป๋า (สลับโหมดอัตโนมัติ)
+const handleWalletWithdraw = async (req, res) => {
+  const pool = db.getPool();
+
+  try {
+    const { userId, storeId, amount, bank_name, account_no } = req.body;
+    const withdrawAmount = Number(amount);
+    const targetId = Number(storeId || userId);
+    const referer = req.headers['referer'] || '';
+
+    if (!targetId || isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุจำนวนเงินที่ถูกต้อง' });
+    }
+
+    // กรณีถอนเงินร้านค้า
+    if (referer.includes('merchant.html') && targetId >= 1 && targetId <= 4) {
+      const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
+      const currentBal = mw.length > 0 ? Number(mw[0].balance || 0) : 0;
+
+      if (currentBal < withdrawAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `ยอดเงินคงเหลือไม่เพียงพอสำหรับการถอน (คงเหลือ: ฿${currentBal.toFixed(2)})`
+        });
+      }
+
+      await pool.query(`UPDATE merchant_wallets SET balance = balance - ? WHERE restaurant_id = ?`, [withdrawAmount, targetId]);
+
+      const bankDesc = bank_name && account_no 
+        ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
+        : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
+
+      await pool.query(
+        `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+         VALUES (?, ?, 'merchant_withdraw', ?)`,
+        [targetId, -withdrawAmount, bankDesc]
+      );
+
+      console.log(`💸 [Merchant Withdraw] ร้าน #${targetId} ถอนเงินสำเร็จ: ฿${withdrawAmount}`);
+
+      return res.json({ 
+        success: true, 
+        message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว` 
+      });
+    }
+
+    // กรณีลูกค้า หรือ ไรเดอร์ ถอนเงิน
+    const uWallet = await getUserWallet(pool, targetId);
+    const currentBal = Number(uWallet.balance || 0);
+
+    if (currentBal < withdrawAmount) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `ยอดเงินคงเหลือไม่เพียงพอสำหรับการถอน (คงเหลือ: ฿${currentBal.toFixed(2)})` 
+      });
+    }
+
+    await pool.query('UPDATE wallets SET balance = balance - ? WHERE id = ?', [withdrawAmount, uWallet.id]);
+
+    const bankDesc = bank_name && account_no 
+      ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
+      : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
+
+    await pool.query(
+      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+       VALUES (?, ?, 'withdraw', ?)`,
+      [uWallet.id, -withdrawAmount, bankDesc]
+    );
+
+    return res.json({ 
+      success: true, 
+      message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว` 
+    });
+
+  } catch (error) {
+    console.error('Withdraw Error:', error);
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
+  }
+};
+
+app.post('/api/wallet/withdraw', handleWalletWithdraw);
+app.post('/wallet/withdraw', handleWalletWithdraw);
 
 // 1. ระบบสมาชิก
 app.post('/api/register', (req, res) => authController.register(req, res));
@@ -507,7 +733,6 @@ app.post('/api/orders', async (req, res) => {
 
     if (!userId) return res.status(400).json({ success: false, message: 'กรุณาล็อกอินใหม่' });
 
-    // แยก restaurant_id ให้ตรงกับเมนูอาหารจริง 100%
     if (items.length > 0) {
       const firstFoodId = Number(items[0].food_id || items[0].id);
       if (firstFoodId >= 1 && firstFoodId <= 4) payload.restaurant_id = 1;
@@ -524,26 +749,26 @@ app.post('/api/orders', async (req, res) => {
     }
     payload.total_amount = amount;
 
-    // ชำระด้วย Wallet ของลูกค้า (ตัดจากตาราง wallets)
+    // ชำระด้วย Wallet ของลูกค้า
+    let uWallet = null;
     if (paymentMethod === 'wallet') {
-      await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [userId]);
-      const [wallets] = await pool.query('SELECT balance FROM wallets WHERE user_id = ?', [userId]);
-      const currentBal = wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
+      uWallet = await getUserWallet(pool, userId);
+      const currentBal = Number(uWallet.balance || 0);
 
       if (currentBal < amount) {
         return res.status(400).json({ success: false, message: 'ยอดเงินคงเหลือในกระเป๋าไม่เพียงพอสำหรับการสั่งซื้อ' });
       }
 
-      await pool.query('UPDATE wallets SET balance = balance - ? WHERE user_id = ?', [amount, userId]);
+      await pool.query('UPDATE wallets SET balance = balance - ? WHERE id = ?', [amount, uWallet.id]);
     }
 
     const orderId = await orderRepo.createOrder(payload);
 
-    if (paymentMethod === 'wallet') {
+    if (paymentMethod === 'wallet' && uWallet) {
       await pool.query(
         `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
          VALUES (?, ?, ?, 'order_payment', ?)`,
-        [userId, orderId, -amount, `ชำระค่าอาหารคำสั่งซื้อ #${orderId}`]
+        [uWallet.id, orderId, -amount, `ชำระค่าอาหารคำสั่งซื้อ #${orderId}`]
       );
     }
 
@@ -585,16 +810,14 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
     if (order.payment_method === 'wallet') {
       const refundAmount = Number(order.total_amount) || 0;
       const targetUid = userId || order.user_id;
+      const targetWallet = await getUserWallet(pool, targetUid);
 
-      await pool.query(
-        `INSERT INTO wallets (user_id, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = balance + ?`,
-        [targetUid, refundAmount, refundAmount]
-      );
+      await pool.query(`UPDATE wallets SET balance = balance + ? WHERE id = ?`, [refundAmount, targetWallet.id]);
 
       await pool.query(
         `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
          VALUES (?, ?, ?, 'refund', ?)`,
-        [targetUid, orderId, refundAmount, `คืนเงินจากการยกเลิกคำสั่งซื้อ #${orderId}`]
+        [targetWallet.id, orderId, refundAmount, `คืนเงินจากการยกเลิกคำสั่งซื้อ #${orderId}`]
       );
     }
 
@@ -665,7 +888,7 @@ app.get('/api/orders/:id/location', (req, res) => {
   res.json({ success: true, location: orderLiveLocations[req.params.id] || { lat: 13.7437, lng: 100.4889, rider_name: 'ไรเดอร์นำส่ง', isDefault: true } });
 });
 
-// 8. ปรับสถานะคำสั่งซื้อ
+// 8. ปรับสถานะคำสั่งซื้อ & Payout (ส่งไรเดอร์ ID ที่กดรับงานมาประมวลผลตรงๆ)
 app.patch('/api/orders/:id/status', async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -691,175 +914,11 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 
     res.json({ success: true, message: `อัปเดตสถานะเป็น ${cleanStatus} เรียบร้อยแล้ว` });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'ไม่สามารถอัปเดตสถานะได้' });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ----------------------------------------------------
-// 9. ระบบกระเป๋าเงิน (แยกขาดร้านค้า 1-4 vs ลูกค้า 100%)
-// ----------------------------------------------------
-// ดึงยอดเงิน: ถ้าเป็นร้านค้าจากหน้า merchant.html หรือระบุชัดเจน ให้ดึง merchant_wallets
-// ถ้าเป็นลูกค้า (แม้จะเป็น userId = 1) ให้ดึงกระเป๋าเงินลูกค้า wallets
-const handleWalletFetch = async (req, res) => {
-  try {
-    const pool = db.getPool();
-    const targetId = Number(req.params.userId);
-    const isMerchantQuery = req.query.type === 'merchant' || req.headers['referer']?.includes('merchant.html');
-
-    if (isMerchantQuery && targetId >= 1 && targetId <= 4) {
-      await pool.query(`INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)`, [targetId]);
-      const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
-      const currentBalance = mw.length > 0 ? Number(mw[0].balance || 0).toFixed(2) : "0.00";
-
-      const [txs] = await pool.query(
-        `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
-        [targetId]
-      );
-      return res.json({ success: true, balance: currentBalance, transactions: txs });
-    }
-
-    // กระเป๋าเงินลูกค้า / ไรเดอร์ (ตาราง wallets)
-    await pool.query(`INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)`, [targetId]);
-    const [w] = await pool.query(`SELECT balance FROM wallets WHERE user_id = ?`, [targetId]);
-    const currentBalance = w.length > 0 ? Number(w[0].balance || 0).toFixed(2) : "0.00";
-
-    const [txs] = await pool.query(
-      `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
-      [targetId]
-    );
-
-    res.json({ success: true, balance: currentBalance, transactions: txs });
-  } catch (err) {
-    console.error('Fetch Wallet Error:', err.message);
-    res.json({ success: true, balance: "0.00", transactions: [] });
-  }
-};
-
-app.get('/api/wallet/:userId', handleWalletFetch);
-app.get('/wallet/:userId', handleWalletFetch);
-
-// เติมเงินเข้ากระเป๋าลูกค้า (เข้าตาราง wallets ตรงๆ 100%)
-const handleWalletTopup = async (req, res) => {
-  const pool = db.getPool();
-  try {
-    const { userId, amount } = req.body;
-    const topupAmount = Number(amount);
-    const uid = Number(userId);
-
-    if (!uid || isNaN(topupAmount) || topupAmount <= 0) {
-      return res.status(400).json({ success: false, message: 'จำนวนเงินเติมไม่ถูกต้อง' });
-    }
-
-    // เพิ่มเงินเข้าตาราง wallets ของลูกค้า
-    await pool.query(
-      `INSERT INTO wallets (user_id, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = balance + ?`,
-      [uid, topupAmount, topupAmount]
-    );
-
-    // บันทึกประวัติ
-    await pool.query(
-      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
-       VALUES (?, ?, 'topup', ?)`,
-      [uid, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
-    );
-
-    console.log(`💳 [Topup Success] User #${uid} เติมเงินสำเร็จ ฿${topupAmount}`);
-    res.json({ success: true, message: `เติมเงินสำเร็จ ฿${topupAmount.toFixed(2)}` });
-  } catch (err) {
-    console.error('Topup Error:', err);
-    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการเติมเงิน: ' + err.message });
-  }
-};
-
-app.post('/api/wallet/topup', handleWalletTopup);
-app.post('/wallet/topup', handleWalletTopup);
-
-// ถอนเงินออกจากกระเป๋า
-const handleWalletWithdraw = async (req, res) => {
-  const pool = db.getPool();
-
-  try {
-    const { userId, amount, bank_name, account_no } = req.body;
-    const withdrawAmount = Number(amount);
-    let targetId = Number(userId);
-
-    if (!targetId || isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      return res.status(400).json({ success: false, message: 'กรุณาระบุจำนวนเงินที่ถูกต้อง' });
-    }
-
-    const isMerchant = req.body.type === 'merchant' || req.headers['referer']?.includes('merchant.html');
-
-    // กรณีร้านค้า 1-4 (ตัดจาก merchant_wallets ร้านตัวเองเท่านั้น ไม่แตะร้านอื่นเด็ดขาด!)
-    if (isMerchant && targetId >= 1 && targetId <= 4) {
-      const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
-      const currentBal = mw.length > 0 ? Number(mw[0].balance || 0) : 0;
-
-      if (currentBal < withdrawAmount) {
-        return res.status(400).json({
-          success: false,
-          message: `ยอดเงินคงเหลือไม่เพียงพอสำหรับการถอน (คงเหลือ: ฿${currentBal.toFixed(2)})`
-        });
-      }
-
-      // ตัดเงินเฉพาะร้านนี้ร้านเดียว 100%
-      await pool.query(`UPDATE merchant_wallets SET balance = balance - ? WHERE restaurant_id = ?`, [withdrawAmount, targetId]);
-
-      const bankDesc = bank_name && account_no 
-        ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
-        : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
-
-      await pool.query(
-        `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
-         VALUES (?, ?, 'merchant_withdraw', ?)`,
-        [targetId, -withdrawAmount, bankDesc]
-      );
-
-      console.log(`💸 [Merchant Withdraw] ร้าน #${targetId} ถอนเงินสำเร็จ: ฿${withdrawAmount}`);
-
-      return res.json({ 
-        success: true, 
-        message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว` 
-      });
-    }
-
-    // กรณี User ทั่วไป หรือไรเดอร์
-    const [wallets] = await pool.query(`SELECT balance FROM wallets WHERE user_id = ?`, [targetId]);
-    const currentBal = wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
-
-    if (currentBal < withdrawAmount) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `ยอดเงินคงเหลือไม่เพียงพอสำหรับการถอน (คงเหลือ: ฿${currentBal.toFixed(2)})` 
-      });
-    }
-
-    await pool.query('UPDATE wallets SET balance = balance - ? WHERE user_id = ?', [withdrawAmount, targetId]);
-
-    const bankDesc = bank_name && account_no 
-      ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
-      : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
-
-    await pool.query(
-      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
-       VALUES (?, ?, 'withdraw', ?)`,
-      [targetId, -withdrawAmount, bankDesc]
-    );
-
-    return res.json({ 
-      success: true, 
-      message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว` 
-    });
-
-  } catch (error) {
-    console.error('Withdraw Error:', error);
-    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด: ' + error.message });
-  }
-};
-
-app.post('/api/wallet/withdraw', handleWalletWithdraw);
-app.post('/wallet/withdraw', handleWalletWithdraw);
-
-// ชี้ตำแหน่งไฟล์ Static
+// Static Files
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, '../')));
 app.use('/Image', express.static(path.join(__dirname, '../Image')));
@@ -886,7 +945,6 @@ function sendHtmlFile(res, fileName1, fileName2) {
   });
 }
 
-// หน้าเว็บทั้งหมด
 app.get('/', (req, res) => sendHtmlFile(res, 'index.html'));
 app.get('/index.html', (req, res) => sendHtmlFile(res, 'index.html'));
 app.get('/login.html', (req, res) => sendHtmlFile(res, 'Login.html', 'login.html'));
