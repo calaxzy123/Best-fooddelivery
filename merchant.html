@@ -93,10 +93,11 @@
             padding: 8px 12px;
             font-size: 15px;
             border-radius: 6px;
-            border: 1px solid #cbd5e1;
+            border: 2px solid #2563eb;
             outline: none;
             background: #fff;
             font-weight: bold;
+            color: #1e293b;
         }
         .order-box {
             background: #fff;
@@ -234,7 +235,7 @@
         <!-- แถบยอดเงินสะสมในระบบ (Wallet Balance) -->
         <section class="wallet-card">
             <div>
-                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ยอดเงินสะสมในกระเป๋า (หัก GP 15% อัตโนมัติเมื่อจัดส่งสำเร็จ)</span>
+                <span style="font-size: 0.9rem; color: #64748b; font-weight: 500;">💰 ยอดเงินสะสมในกระเป๋าของร้านนี้ (หัก GP 15% อัตโนมัติเมื่อจัดส่งสำเร็จ)</span>
                 <h2 style="margin: 6px 0 0 0; color: #0f172a; font-size: 2.1rem; letter-spacing: -0.5px;">฿<span id="walletBalance">0.00</span></h2>
             </div>
             <div>
@@ -251,12 +252,12 @@
 
             <div class="control-row">
                 <div>
-                    <label style="font-weight:bold; font-size:14px;">ร้านค้าของคุณ: </label>
+                    <label style="font-weight:bold; font-size:14px;">เลือกร้านค้าที่ต้องการจัดการ: </label>
                     <select id="restaurantSelect" class="select-store" onchange="onSelectStore()">
-                        <option value="1">ร้านกะเพราอร่อย (ID: 1)</option>
-                        <option value="2">Pizza House (ID: 2)</option>
-                        <option value="3">Burger Station (ID: 3)</option>
-                        <option value="4">ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)</option>
+                        <option value="1">🍛 ร้านกะเพราอร่อย (ID: 1)</option>
+                        <option value="2">🍕 Pizza House (ID: 2)</option>
+                        <option value="3">🍔 Burger Station (ID: 3)</option>
+                        <option value="4">🍜 ก๋วยเตี๋ยวเรือเจ้าอร่อย (ID: 4)</option>
                     </select>
                 </div>
                 <div style="display:flex; gap:10px;">
@@ -320,89 +321,35 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        function detectStoreId(user) {
-            const name = String(user.name || '').toLowerCase();
-            const email = String(user.email || '').toLowerCase();
-            
-            if (name.includes('pizza') || email.includes('pizza')) return 2;
-            if (name.includes('burger') || email.includes('burger')) return 3;
-            if (name.includes('noodle') || name.includes('เตี๋ยว') || email.includes('noodle')) return 4;
-            if (name.includes('กะเพรา') || name.includes('kapao') || email.includes('kapao')) return 1;
-
-            if (user.restaurant_id && Number(user.restaurant_id) > 0) {
-                return Number(user.restaurant_id);
-            }
-            
-            return Number(user.id || 1);
-        }
-
-        let currentStoreId = detectStoreId(currentUser);
+        // ดึงค่าร้านที่เลือกไว้ในหน้านี้ (ถ้ายังไม่มี ให้ยึดจาก restaurant_id ของ user หรือ 1)
+        let currentStoreId = Number(localStorage.getItem('activeStoreView') || currentUser.restaurant_id || 1);
+        if (currentStoreId < 1 || currentStoreId > 4) currentStoreId = 1;
 
         async function initMerchant() {
-            currentStoreId = detectStoreId(currentUser);
-            currentUser.restaurant_id = currentStoreId;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            localStorage.setItem('user', JSON.stringify(currentUser));
-
-            await loadStoreDropdown();
+            const select = document.getElementById('restaurantSelect');
+            if (select) {
+                select.disabled = false; // ปลดล็อกให้สลับดูและถอนเงินได้ทุกร้าน
+                select.value = String(currentStoreId);
+            }
+            updateProfileCard();
+            await loadOrders();
             await loadWalletBalance();
         }
 
-        async function loadStoreDropdown() {
-            const select = document.getElementById('restaurantSelect');
-            let allStores = [
-                { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1 กทม." },
-                { id: 2, name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
-                { id: 3, name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
-                { id: 4, name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
-            ];
-
-            try {
-                const res = await fetch('/api/restaurants?_t=' + Date.now(), { cache: 'no-store' });
-                if (res.ok) {
-                    const json = await res.json();
-                    const fetchedStores = json.restaurants || json.data;
-                    if (Array.isArray(fetchedStores) && fetchedStores.length > 0) {
-                        allStores = fetchedStores;
-                    }
-                }
-            } catch (err) {
-                console.error("Store dropdown error:", err);
-            }
-
-            const myStore = allStores.find(s => Number(s.id) === Number(currentStoreId)) || 
-                            storeProfiles[currentStoreId] || 
-                            allStores[0];
-            currentStoreId = myStore.id || currentStoreId;
-
-            if (userRole === 'admin') {
-                select.disabled = false;
-                select.innerHTML = allStores.map(function(s) {
-                    const isSelected = Number(s.id) === Number(currentStoreId) ? 'selected' : '';
-                    return '<option value="' + s.id + '" ' + isSelected + '>' + s.name + ' (ID: ' + s.id + ')</option>';
-                }).join('');
-            } else {
-                select.innerHTML = '<option value="' + currentStoreId + '" selected>🔒 ' + (myStore.name || 'ร้านของคุณ') + ' (ร้านของคุณ)</option>';
-                select.disabled = true;
-            }
-
-            updateProfileCard(myStore);
-            loadOrders();
-        }
-
-        function updateProfileCard(store) {
-            const prof = storeProfiles[currentStoreId] || store;
-            document.getElementById('storeProfileName').innerText = '🏪 ' + (prof.name || 'ร้านอาหาร');
-            document.getElementById('storeProfilePhone').innerText = prof.phone || '082-222-2222';
-            document.getElementById('storeProfileAddress').innerText = prof.address || 'กรุงเทพมหานคร';
+        function updateProfileCard() {
+            const prof = storeProfiles[currentStoreId] || storeProfiles[1];
+            document.getElementById('storeProfileName').innerText = '🏪 ' + prof.name;
+            document.getElementById('storeProfilePhone').innerText = prof.phone;
+            document.getElementById('storeProfileAddress').innerText = prof.address;
         }
 
         function onSelectStore() {
             const select = document.getElementById('restaurantSelect');
             currentStoreId = parseInt(select.value) || 1;
-            updateProfileCard(storeProfiles[currentStoreId]);
+            localStorage.setItem('activeStoreView', currentStoreId);
+            updateProfileCard();
             loadOrders();
-            loadWalletBalance(); // รีเฟรชยอดเงินให้ตรงกับร้านที่เลือกทันที
+            loadWalletBalance(); // รีเฟรชยอดเงินของร้านที่เลือกทันที
         }
 
         async function loadOrders() {
@@ -501,11 +448,10 @@
             }
         }
 
-        // ดึงยอดเงินจาก currentStoreId โดยตรง ป้องกันเงินค้าง
+        // ดึงยอดเงินเฉพาะร้าน currentStoreId เท่านั้น
         async function loadWalletBalance() {
-            const targetId = Number(currentStoreId || currentUser.restaurant_id || currentUser.id || 1);
             try {
-                const res = await fetch('/api/wallet/' + targetId + '?_t=' + Date.now(), { cache: 'no-store' });
+                const res = await fetch('/api/wallet/' + currentStoreId + '?_t=' + Date.now(), { cache: 'no-store' });
                 const data = await res.json();
                 if (data.success) {
                     const balanceEl = document.getElementById('walletBalance');
@@ -521,19 +467,19 @@
             }
         }
 
-        // ถอนเงินออกจากกระเป๋าร้านค้านั้นโดยตรง พร้อมระบุข้อมูลธนาคาร
+        // ถอนเงินออกจากร้านที่กำลังเปิดดูอยู่เท่านั้น (currentStoreId)
         async function requestWithdrawal() {
-            const targetId = Number(currentStoreId || currentUser.restaurant_id || currentUser.id || 1);
             const balanceEl = document.getElementById('walletBalance');
             const currentBalance = parseFloat(balanceEl?.textContent.replace(/,/g, '') || '0');
+            const storeName = (storeProfiles[currentStoreId] || {}).name || ('ร้าน #' + currentStoreId);
 
             if (currentBalance <= 0) {
-                alert('ยอดเงินในกระเป๋าของคุณยังไม่เพียงพอสำหรับการถอน');
+                alert('ยอดเงินในกระเป๋าของ ' + storeName + ' ยังไม่เพียงพอสำหรับการถอน');
                 return;
             }
 
             const inputAmount = prompt(
-                '💰 ยอดเงินคงเหลือที่ถอนได้: ฿' + currentBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + '\n\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร (บาท):', 
+                '💰 [' + storeName + '] ยอดเงินคงเหลือที่ถอนได้: ฿' + currentBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + '\n\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร (บาท):', 
                 currentBalance.toFixed(2)
             );
             if (!inputAmount) return;
@@ -545,7 +491,7 @@
             }
 
             if (amount > currentBalance) {
-                alert('ยอดเงินที่ระบุเกินกว่ายอดเงินคงเหลือในกระเป๋า');
+                alert('ยอดเงินที่ระบุเกินกว่ายอดเงินคงเหลือในกระเป๋าของร้านนี้');
                 return;
             }
 
@@ -556,7 +502,7 @@
             if (!bankAccount) return;
 
             const confirmWithdraw = confirm(
-                'ยืนยันการทำรายการถอนเงิน:\n' +
+                'ยืนยันการทำรายการถอนเงินของ [' + storeName + ']:\n' +
                 '- จำนวนเงิน: ฿' + amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + '\n' +
                 '- ธนาคาร: ' + bankName + '\n' +
                 '- บัญชี: ' + bankAccount + '\n\n' +
@@ -569,7 +515,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        userId: targetId, 
+                        userId: Number(currentStoreId), // ส่ง ID ของร้านที่เลือกตรงๆ เสมอ
                         amount: amount,
                         bank_name: bankName,
                         account_no: bankAccount
@@ -608,10 +554,8 @@
                     alert('✅ ' + data.message + '\nรหัสร้านของคุณคือ ID: ' + data.restaurantId);
                     closeModal();
                     currentStoreId = data.restaurantId;
-                    currentUser.restaurant_id = currentStoreId;
-                    localStorage.setItem('user', JSON.stringify(currentUser));
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    await loadStoreDropdown();
+                    localStorage.setItem('activeStoreView', currentStoreId);
+                    await initMerchant();
                 } else {
                     alert('❌ ' + (data.message || 'สมัครไม่สำเร็จ'));
                 }
