@@ -20,7 +20,7 @@ const orderRepo = new OrderRepository();
 const orderLiveLocations = {};
 
 // ----------------------------------------------------
-// ระบบเตรียมตารางฐานข้อมูลอัตโนมัติ (แยกตารางเด็ดขาด + ปลดล็อก Foreign Key)
+// ระบบเตรียมตารางฐานข้อมูลอัตโนมัติ (แยกตารางเด็ดขาด 100%)
 // ----------------------------------------------------
 async function initializeDatabaseTables() {
   try {
@@ -130,7 +130,7 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // ปลดล็อก Foreign Key Constraint เก่าที่ค้างอยู่ (ถ้ามี)
+    // ปลดล็อก Foreign Key Constraint ที่ค้างอยู่ (ถ้ามี)
     try {
       await pool.query(`ALTER TABLE wallet_transactions DROP FOREIGN KEY wallet_transactions_ibfk_1`);
     } catch (e) {}
@@ -147,7 +147,7 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // สร้างกระเป๋าของร้านค้า 1-4 ให้พร้อมใช้งาน
+    // สร้างกระเป๋าร้านค้าทั้ง 4 ร้านให้พร้อม
     for (let sId = 1; sId <= 4; sId++) {
       await pool.query('INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)', [sId]);
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [sId]);
@@ -190,7 +190,7 @@ async function initializeDatabaseTables() {
         image = VALUES(image);
     `);
 
-    console.log('✅ [Database] ปลดล็อก Constraint และแยกกระเป๋าเงินเด็ดขาด 100%');
+    console.log('✅ [Database] โครงสร้างตารางแยกกระเป๋าเงินเด็ดขาด 100%');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
@@ -230,7 +230,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     const merchantNet = Number((foodSubtotal * 0.85).toFixed(2)); // หัก GP 15%
     const deliveryFee = 20.00;
 
-    // 1. โอนเงินให้ร้านค้านั้นๆ เข้า merchant_wallets ร้านใครร้านมัน
+    // 1. โอนเงินให้ร้านค้านั้นๆ เข้า merchant_wallets ตรงๆ
     const [existingShop] = await pool.query(
       `SELECT id FROM wallet_transactions WHERE order_id = ? AND wallet_id = ? AND type = 'merchant_payout' LIMIT 1`,
       [oId, restId]
@@ -507,7 +507,7 @@ app.post('/api/orders', async (req, res) => {
 
     if (!userId) return res.status(400).json({ success: false, message: 'กรุณาล็อกอินใหม่' });
 
-    // กำหนด restaurant_id ให้ตรงกับเมนูอาหารจริง 100%
+    // แยก restaurant_id ให้ตรงกับเมนูอาหารจริง 100%
     if (items.length > 0) {
       const firstFoodId = Number(items[0].food_id || items[0].id);
       if (firstFoodId >= 1 && firstFoodId <= 4) payload.restaurant_id = 1;
@@ -698,13 +698,15 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 // ----------------------------------------------------
 // 9. ระบบกระเป๋าเงิน (แยกขาดร้านค้า 1-4 vs ลูกค้า 100%)
 // ----------------------------------------------------
+// ดึงยอดเงิน: ถ้าเป็นร้านค้าจากหน้า merchant.html หรือระบุชัดเจน ให้ดึง merchant_wallets
+// ถ้าเป็นลูกค้า (แม้จะเป็น userId = 1) ให้ดึงกระเป๋าเงินลูกค้า wallets
 const handleWalletFetch = async (req, res) => {
   try {
     const pool = db.getPool();
     const targetId = Number(req.params.userId);
+    const isMerchantQuery = req.query.type === 'merchant' || req.headers['referer']?.includes('merchant.html');
 
-    // ถ้ารหัส 1-4 คือร้านค้า (ดึงจาก merchant_wallets ร้านใครร้านมัน ไม่ปนกับใครเด็ดขาด!)
-    if (targetId >= 1 && targetId <= 4) {
+    if (isMerchantQuery && targetId >= 1 && targetId <= 4) {
       await pool.query(`INSERT IGNORE INTO merchant_wallets (restaurant_id, balance) VALUES (?, 0.00)`, [targetId]);
       const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
       const currentBalance = mw.length > 0 ? Number(mw[0].balance || 0).toFixed(2) : "0.00";
@@ -713,11 +715,10 @@ const handleWalletFetch = async (req, res) => {
         `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
         [targetId]
       );
-
       return res.json({ success: true, balance: currentBalance, transactions: txs });
     }
 
-    // ถ้าไม่ใช่ร้านค้า (ลูกค้า / ไรเดอร์) ดึงจากตาราง wallets
+    // กระเป๋าเงินลูกค้า / ไรเดอร์ (ตาราง wallets)
     await pool.query(`INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)`, [targetId]);
     const [w] = await pool.query(`SELECT balance FROM wallets WHERE user_id = ?`, [targetId]);
     const currentBalance = w.length > 0 ? Number(w[0].balance || 0).toFixed(2) : "0.00";
@@ -737,7 +738,7 @@ const handleWalletFetch = async (req, res) => {
 app.get('/api/wallet/:userId', handleWalletFetch);
 app.get('/wallet/:userId', handleWalletFetch);
 
-// เติมเงินเข้ากระเป๋าลูกค้า (เข้าตาราง wallets ตรงๆ 100% ไม่ติด Foreign Key)
+// เติมเงินเข้ากระเป๋าลูกค้า (เข้าตาราง wallets ตรงๆ 100%)
 const handleWalletTopup = async (req, res) => {
   const pool = db.getPool();
   try {
@@ -773,7 +774,7 @@ const handleWalletTopup = async (req, res) => {
 app.post('/api/wallet/topup', handleWalletTopup);
 app.post('/wallet/topup', handleWalletTopup);
 
-// ถอนเงินออกจากกระเป๋า (ร้านค้าตัดจาก merchant_wallets ของตัวเองร้านเดียว!)
+// ถอนเงินออกจากกระเป๋า
 const handleWalletWithdraw = async (req, res) => {
   const pool = db.getPool();
 
@@ -786,8 +787,10 @@ const handleWalletWithdraw = async (req, res) => {
       return res.status(400).json({ success: false, message: 'กรุณาระบุจำนวนเงินที่ถูกต้อง' });
     }
 
+    const isMerchant = req.body.type === 'merchant' || req.headers['referer']?.includes('merchant.html');
+
     // กรณีร้านค้า 1-4 (ตัดจาก merchant_wallets ร้านตัวเองเท่านั้น ไม่แตะร้านอื่นเด็ดขาด!)
-    if (targetId >= 1 && targetId <= 4) {
+    if (isMerchant && targetId >= 1 && targetId <= 4) {
       const [mw] = await pool.query(`SELECT balance FROM merchant_wallets WHERE restaurant_id = ?`, [targetId]);
       const currentBal = mw.length > 0 ? Number(mw[0].balance || 0) : 0;
 
