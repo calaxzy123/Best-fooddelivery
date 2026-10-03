@@ -145,7 +145,7 @@ async function initializeDatabaseTables() {
         address = VALUES(address);
     `);
 
-    // --- AUTO-SEED เมนูอาหาร 13 รายการ (ระบุ restaurant_id แน่นอน 100%) ---
+    // --- AUTO-SEED เมนูอาหาร 13 รายการ ผูกกับรหัสร้านตายตัว 100% ---
     await pool.query(`
       INSERT INTO foods (id, restaurant_id, name, price, image) VALUES 
       (1, 1, 'ข้าวกะเพราหมูสับ', 50.00, 'Image/kapao-moosub.jpg'),
@@ -173,14 +173,14 @@ async function initializeDatabaseTables() {
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [uid]);
     }
 
-    console.log('✅ [Database] โครงสร้างตาราง ร้านค้าทั้ง 4 ร้าน และเมนูอาหารทั้งหมดพร้อมใช้งานสมบูรณ์');
+    console.log('✅ [Database] ตารางและกระเป๋าเงินพร้อมใช้งานสมบูรณ์');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
 }
 
 // ----------------------------------------------------
-// ฟังก์ชันจัดสรรเงินเข้ากระเป๋าร้านค้าแต่ละร้านและไรเดอร์ (Hard Partition 100%)
+// ฟังก์ชันจัดสรรเงินเข้ากระเป๋าร้านค้าแต่ละร้านและไรเดอร์ (Hard Isolation)
 // ----------------------------------------------------
 async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
@@ -240,7 +240,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     const gpRate = 0.15; // หัก GP 15%
     const deliveryFee = 20.00;
 
-    // 3. จัดสรรเงินให้ร้านค้าที่ขายอาหารได้ในบิลนี้
+    // 3. จัดสรรเงินให้ร้านค้าตามยอดอาหารจริง
     for (const [storeIdStr, foodTotal] of Object.entries(storeRevenue)) {
       const storeId = Number(storeIdStr);
       if (foodTotal <= 0) continue;
@@ -269,16 +269,16 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
             actualWalletId, 
             oId, 
             merchantNet, 
-            `รายได้คำสั่งซื้อ #${oId} (ค่าอาหาร ฿${foodTotal.toFixed(2)} หัก GP 15%)`
+            `รายได้คำสั่งซื้อ #${oId} (ค่าอาหารร้าน #${storeId} ฿${foodTotal.toFixed(2)} หัก GP 15%)`
           ]
         );
         console.log(`💰 [Shop Paid] บิล #${oId}: ร้าน #${storeId} ได้รับ ฿${merchantNet} (ยอดอาหาร ฿${foodTotal.toFixed(2)})`);
       }
     }
 
-    // 4. จัดสรรค่ารอบให้ไรเดอร์ (20 บาท ป้องกันจ่ายซ้ำ และแยกจากร้านกะเพราเด็ดขาด)
+    // 4. จัดสรรค่ารอบให้ไรเดอร์ (20 บาท ป้องกันจ่ายซ้ำ และแยกกระเป๋าจากร้านค้าเด็ดขาด)
     let riderUid = explicitRiderId || order.rider_id;
-    if (!riderUid || riderUid <= 4) {
+    if (!riderUid || Number(riderUid) <= 4) {
       const [rUser] = await pool.query('SELECT id FROM users WHERE role = "rider" ORDER BY id ASC LIMIT 1');
       riderUid = rUser.length > 0 ? rUser[0].id : 5;
     }
@@ -518,7 +518,7 @@ app.patch('/api/restaurants/:id', async (req, res) => {
 
 app.get('/api/restaurants/:id/foods', (req, res) => foodController.getFoodsByRestaurant(req, res));
 
-// 3. เส้นทางตะกร้าสินค้า (Cart) - ล็อกรหัสร้านตาม Food ID
+// 3. เส้นทางตะกร้าสินค้า (Cart) - ล็อกรหัสร้านตาม Food ID เด็ดขาด
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -569,6 +569,7 @@ app.post('/api/cart', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ข้อมูลตะกร้าไม่ครบถ้วน' });
     }
 
+    // กฎเหล็กล็อกร้านค้าตามรหัสอาหาร
     let resolvedRid = 1;
     if (fid >= 1 && fid <= 4) resolvedRid = 1;
     else if (fid >= 5 && fid <= 7) resolvedRid = 2;
@@ -628,7 +629,7 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน กรุณาล็อกอินใหม่' });
     }
 
-    // กำหนด restaurant_id จาก Food ID ชัดเจน
+    // กำหนด restaurant_id ให้ตรงกับเมนูอาหารจริง
     if (items.length > 0) {
       const firstFoodId = Number(items[0].food_id || items[0].id);
       if (firstFoodId >= 1 && firstFoodId <= 4) payload.restaurant_id = 1;
@@ -884,24 +885,25 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 });
 
 // 9. ระบบกระเป๋าเงิน (Wallet, Top-up & Withdrawal)
-// ดึงยอดเงินเฉพาะ ID นั้นๆ ตรงไปตรงมา
+// ดึงยอดเงินเฉพาะ ID นั้นๆ ตรงไปตรงมา (1: กะเพรา, 2: Pizza, 3: Burger, 4: ก๋วยเตี๋ยว, 5: ไรเดอร์)
 const handleWalletFetch = async (req, res) => {
   try {
     const pool = db.getPool();
     const targetId = Number(req.params.userId);
 
+    // ตรวจสอบกระเป๋าเงิน
+    await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [targetId]);
     let [wallets] = await pool.query('SELECT id, balance FROM wallets WHERE user_id = ?', [targetId]);
 
-    if (wallets.length === 0) {
-      return res.json({ success: true, balance: "0.00", transactions: [] });
-    }
+    const wallet = wallets[0];
+    const currentBalance = wallet ? wallet.balance : "0.00";
+    const walletPk = wallet ? wallet.id : targetId;
 
-    const currentBalance = wallets[0].balance;
     const [txs] = await pool.query(
       `SELECT * FROM wallet_transactions 
        WHERE wallet_id = ?
        ORDER BY created_at DESC LIMIT 20`,
-      [wallets[0].id]
+      [walletPk]
     );
 
     res.json({
@@ -934,13 +936,13 @@ const handleWalletTopup = async (req, res) => {
     await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [topupAmount, uid]);
 
     const [w] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [uid]);
-    if (w.length > 0) {
-      await pool.query(
-        `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
-         VALUES (?, ?, 'topup', ?)`,
-        [w[0].id, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
-      );
-    }
+    const walletPk = w[0].id;
+
+    await pool.query(
+      `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+       VALUES (?, ?, 'topup', ?)`,
+      [walletPk, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
+    );
 
     res.json({ success: true, message: `เติมเงินสำเร็จ ฿${topupAmount.toFixed(2)}` });
   } catch (err) {
