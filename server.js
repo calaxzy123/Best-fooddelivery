@@ -181,6 +181,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
 
   try {
+    // 1. ดึงข้อมูลออเดอร์
     const [orders] = await pool.query(
       `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id, r.name AS restaurant_name
        FROM orders o
@@ -191,14 +192,28 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
 
     if (orders.length === 0) return;
     const order = orders[0];
+    const restId = Number(order.restaurant_id || 1);
+
+    // 2. คำนวณยอดเงินค่าอาหารจริงจากตาราง order_items (แม่นยำ 100%)
+    const [itemRows] = await pool.query(
+      `SELECT price, quantity FROM order_items WHERE order_id = ?`,
+      [order.id]
+    );
+
+    let calculatedFoodTotal = 0;
+    if (itemRows.length > 0) {
+      calculatedFoodTotal = itemRows.reduce((sum, it) => {
+        return sum + (Number(it.price || 0) * Number(it.quantity || 1));
+      }, 0);
+    } else {
+      calculatedFoodTotal = Math.max(0, Number(order.total_amount || 0) - 20.00);
+    }
 
     const deliveryFee = 20.00;
-    const totalAmount = Number(order.total_amount) || 0;
-    const foodAmount = Math.max(0, totalAmount - deliveryFee);
-    const gpFee = foodAmount * 0.15; // GP 15%
-    const merchantNet = Number((foodAmount - gpFee).toFixed(2));
+    const gpFee = calculatedFoodTotal * 0.15; // GP 15%
+    const merchantNet = Number((calculatedFoodTotal - gpFee).toFixed(2));
 
-    // กำหนด User ID ของเจ้าของร้านค้าตามรหัสร้านค้าโดยตรง
+    // 3. แมปหา User ID ของร้านค้า
     const storeOwnerMap = {
       1: 1, // ร้านกะเพรา -> User ID 1
       2: 2, // Pizza House -> User ID 2
@@ -206,19 +221,26 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
       4: 4  // ก๋วยเตี๋ยวเรือ -> User ID 4
     };
 
-    let merchantUserId = storeOwnerMap[order.restaurant_id] || order.owner_id || order.restaurant_id;
+    let merchantUserId = storeOwnerMap[restId] || order.owner_id || restId;
 
-    // ตรวจสอบว่าในตาราง users มีบัญชีนี้อยู่จริงหรือไม่
-    const [uCheck] = await pool.query('SELECT id FROM users WHERE id = ?', [merchantUserId]);
-    if (uCheck.length === 0) {
-      const [altUser] = await pool.query('SELECT id FROM users WHERE restaurant_id = ? LIMIT 1', [order.restaurant_id]);
-      if (altUser.length > 0) merchantUserId = altUser[0].id;
+    // ตรวจสอบในตาราง users หากมีบัญชีที่ restaurant_id ตรงกันให้ใช้ ID นั้น
+    const [matchedUsers] = await pool.query(
+      `SELECT id FROM users WHERE restaurant_id = ? OR id = ? ORDER BY id ASC LIMIT 1`,
+      [restId, merchantUserId]
+    );
+    if (matchedUsers.length > 0) {
+      merchantUserId = matchedUsers[0].id;
     }
 
-    // โอนเงินเข้ากระเป๋าของร้านค้ารายนั้น
-    if (merchantUserId && merchantNet > 0) {
+    // 4. โอนเงินเข้ากระเป๋าของร้านค้า (บันทึกทั้ง merchantUserId และ restId ป้องกัน Dashboard อ่านคนละ ID)
+    if (merchantNet > 0) {
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [merchantUserId]);
       await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, merchantUserId]);
+
+      if (merchantUserId !== restId) {
+        await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [restId]);
+        await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, restId]);
+      }
 
       const [w] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [merchantUserId]);
       if (w.length > 0) {
@@ -229,14 +251,14 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
             w[0].id, 
             order.id, 
             merchantNet, 
-            `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${foodAmount.toFixed(2)} หัก GP 15%)`
+            `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${calculatedFoodTotal.toFixed(2)} หัก GP 15%)`
           ]
         );
       }
-      console.log(`💰 [Payout Shop] ร้าน #${order.restaurant_id} (${order.restaurant_name || 'ร้านค้า'}) ได้รับเงินเข้า Wallet: ฿${merchantNet} (User ID #${merchantUserId})`);
+      console.log(`💰 [Payout Shop] ร้านค้า ID #${restId} (${order.restaurant_name || 'ร้านค้า'}) ได้รับเงิน ฿${merchantNet} (Wallet User ID #${merchantUserId})`);
     }
 
-    // โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
+    // 5. โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
     let riderUserId = explicitRiderId || order.rider_id;
     if (!riderUserId) {
       const [riderCheck] = await pool.query('SELECT id FROM users WHERE role = "rider" ORDER BY id ASC LIMIT 1');
@@ -510,7 +532,7 @@ app.delete('/api/cart/:userId', async (req, res) => {
   }
 });
 
-// 4. เส้นทางคำสั่งซื้อ (Orders) - ไม่ใช้ Transaction ซ้อน ป้องกัน Lock wait timeout
+// 4. เส้นทางคำสั่งซื้อ (Orders)
 app.post('/api/orders', async (req, res) => {
   const pool = db.getPool();
 
@@ -783,12 +805,21 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 });
 
 // 9. ระบบกระเป๋าเงิน (Wallet, Top-up & Withdrawal)
+// รองรับทั้ง User ID และ Restaurant ID ในการดึงยอดเงิน
 const handleWalletFetch = async (req, res) => {
   try {
     const pool = db.getPool();
     const uid = Number(req.params.userId);
 
-    const [wallets] = await pool.query('SELECT * FROM wallets WHERE user_id = ?', [uid]);
+    // ดึงกระเป๋าเงินโดยตรง หรือค้นหากระเป๋าของร้านค้าถ้า uid เป็น restaurant_id
+    let [wallets] = await pool.query('SELECT * FROM wallets WHERE user_id = ?', [uid]);
+
+    if (wallets.length === 0) {
+      const [u] = await pool.query('SELECT id FROM users WHERE restaurant_id = ? LIMIT 1', [uid]);
+      if (u.length > 0) {
+        [wallets] = await pool.query('SELECT * FROM wallets WHERE user_id = ?', [u[0].id]);
+      }
+    }
 
     if (wallets.length === 0) {
       return res.json({ success: true, balance: "0.00", transactions: [] });
