@@ -320,7 +320,6 @@
             nameEl.innerText = currentUser.name + ' (' + userRole + ')';
         }
 
-        // จับคู่ ID ร้านค้าจากชื่อบัญชีและอีเมลเป็นหลัก เพื่อป้องกันการดึงผิดร้าน
         function detectStoreId(user) {
             const name = String(user.name || '').toLowerCase();
             const email = String(user.email || '').toLowerCase();
@@ -352,7 +351,7 @@
         async function loadStoreDropdown() {
             const select = document.getElementById('restaurantSelect');
             let allStores = [
-                { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1" },
+                { id: 1, name: "ร้านกะเพราอร่อย", phone: "081-111-1111", address: "ซอยสุขุมวิท 101/1 กทม." },
                 { id: 2, name: "Pizza House", phone: "082-222-2222", address: "สีลมซอย 3 กทม." },
                 { id: 3, name: "Burger Station", phone: "083-333-3333", address: "ลาดพร้าว 71 กทม." },
                 { id: 4, name: "ก๋วยเตี๋ยวเรือเจ้าอร่อย", phone: "084-444-4444", address: "พหลโยธิน 32 กทม." }
@@ -401,7 +400,9 @@
         function onSelectStore() {
             const select = document.getElementById('restaurantSelect');
             currentStoreId = parseInt(select.value) || 1;
+            updateProfileCard(storeProfiles[currentStoreId]);
             loadOrders();
+            loadWalletBalance(); // รีเฟรชยอดเงินให้ตรงกับร้านที่เลือกทันที
         }
 
         async function loadOrders() {
@@ -500,11 +501,11 @@
             }
         }
 
+        // ดึงยอดเงินจาก currentStoreId โดยตรง ป้องกันเงินค้าง
         async function loadWalletBalance() {
-            const targetUserId = currentUser.id || currentStoreId;
-            if (!targetUserId) return;
+            const targetId = Number(currentStoreId || currentUser.restaurant_id || currentUser.id || 1);
             try {
-                const res = await fetch('/api/wallet/' + targetUserId + '?_t=' + Date.now(), { cache: 'no-store' });
+                const res = await fetch('/api/wallet/' + targetId + '?_t=' + Date.now(), { cache: 'no-store' });
                 const data = await res.json();
                 if (data.success) {
                     const balanceEl = document.getElementById('walletBalance');
@@ -520,14 +521,21 @@
             }
         }
 
+        // ถอนเงินออกจากกระเป๋าร้านค้านั้นโดยตรง พร้อมระบุข้อมูลธนาคาร
         async function requestWithdrawal() {
-            const currentBalance = parseFloat(document.getElementById('walletBalance')?.textContent.replace(/,/g, '') || '0');
+            const targetId = Number(currentStoreId || currentUser.restaurant_id || currentUser.id || 1);
+            const balanceEl = document.getElementById('walletBalance');
+            const currentBalance = parseFloat(balanceEl?.textContent.replace(/,/g, '') || '0');
+
             if (currentBalance <= 0) {
                 alert('ยอดเงินในกระเป๋าของคุณยังไม่เพียงพอสำหรับการถอน');
                 return;
             }
 
-            const inputAmount = prompt('ยอดเงินที่ถอนได้: ฿' + currentBalance.toFixed(2) + '\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร:', currentBalance.toFixed(2));
+            const inputAmount = prompt(
+                '💰 ยอดเงินคงเหลือที่ถอนได้: ฿' + currentBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + '\n\nกรุณาระบุจำนวนเงินที่ต้องการถอนเข้าบัญชีธนาคาร (บาท):', 
+                currentBalance.toFixed(2)
+            );
             if (!inputAmount) return;
 
             const amount = parseFloat(inputAmount);
@@ -541,12 +549,31 @@
                 return;
             }
 
+            const bankName = prompt('🏦 กรุณาระบุธนาคาร (เช่น กสิกรไทย, ไทยพาณิชย์, พร้อมเพย์):', 'กสิกรไทย (KBANK)');
+            if (!bankName) return;
+
+            const bankAccount = prompt('🔢 กรุณาระบุเลขที่บัญชีธนาคาร หรือเบอร์พร้อมเพย์:', '123-4-56789-0');
+            if (!bankAccount) return;
+
+            const confirmWithdraw = confirm(
+                'ยืนยันการทำรายการถอนเงิน:\n' +
+                '- จำนวนเงิน: ฿' + amount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + '\n' +
+                '- ธนาคาร: ' + bankName + '\n' +
+                '- บัญชี: ' + bankAccount + '\n\n' +
+                'กดยืนยันเพื่อดำเนินการโอนเงิน'
+            );
+            if (!confirmWithdraw) return;
+
             try {
-                const targetUserId = currentUser.id || currentStoreId;
                 const res = await fetch('/api/wallet/withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: Number(targetUserId), amount: amount })
+                    body: JSON.stringify({ 
+                        userId: targetId, 
+                        amount: amount,
+                        bank_name: bankName,
+                        account_no: bankAccount
+                    })
                 });
                 const result = await res.json();
                 alert(result.message);
