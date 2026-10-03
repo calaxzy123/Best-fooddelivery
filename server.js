@@ -132,7 +132,7 @@ async function initializeDatabaseTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // --- AUTO-SEED ร้านค้าหลัก 4 ร้าน (ป้องกัน ID ร้านค้าสูญหายบน Cloud) ---
+    // --- AUTO-SEED ร้านค้าหลัก 4 ร้าน ---
     await pool.query(`
       INSERT INTO restaurants (id, owner_id, name, phone, address, status) VALUES
       (1, 1, 'ร้านกะเพราอร่อย', '081-111-1111', 'ซอยสุขุมวิท 101/1 กทม.', 'open'),
@@ -252,6 +252,33 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
 // เช็กสถานะเซิร์ฟเวอร์ (Health Check)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// เส้นทางพิเศษสำหรับรีเซ็ตและล้างข้อมูลออเดอร์เก่าทิ้งทั้งหมด (แก้ปัญหาบิลค้างมั่ว)
+app.get('/api/admin/reset-orders', async (req, res) => {
+  try {
+    const pool = db.getPool();
+    await pool.query('DELETE FROM order_items');
+    await pool.query('DELETE FROM orders');
+    await pool.query('DELETE FROM carts');
+    await pool.query('DELETE FROM wallet_transactions WHERE order_id IS NOT NULL');
+    
+    try {
+      await pool.query('ALTER TABLE order_items AUTO_INCREMENT = 1');
+      await pool.query('ALTER TABLE orders AUTO_INCREMENT = 1');
+    } catch (e) {}
+
+    res.send(`
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1 style="color: #10b981;">✅ ล้างข้อมูลคำสั่งซื้อเก่าทั้งหมดเรียบร้อยแล้ว!</h1>
+        <p>ตาราง orders, order_items และ carts สะอาดหมดจดแล้ว</p>
+        <a href="/order.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: bold;">กลับไปหน้าคำสั่งซื้อ</a>
+      </div>
+    `);
+  } catch (err) {
+    console.error('Reset Orders Error:', err);
+    res.status(500).send(`เกิดข้อผิดพลาด: ${err.message}`);
+  }
 });
 
 // 1. เส้นทางระบบสมาชิก (Auth & User Profile)
@@ -467,16 +494,19 @@ app.delete('/api/cart/:userId', async (req, res) => {
   }
 });
 
-// 4. เส้นทางคำสั่งซื้อ (Orders)
+// 4. เส้นทางคำสั่งซื้อ (Orders) - ปลดล็อก Deadlock และไม่ใช้ Transaction ซ้อน
 app.post('/api/orders', async (req, res) => {
   const pool = db.getPool();
-  let conn;
 
   try {
     const payload = { ...req.body };
     const userId = Number(payload.user_id || payload.userId);
-    const paymentMethod = payload.payment_method;
+    const paymentMethod = String(payload.payment_method || 'cash').toLowerCase();
     const items = Array.isArray(payload.items) ? payload.items : [];
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน กรุณาล็อกอินใหม่' });
+    }
 
     // ตรวจสอบ restaurant_id ที่แท้จริงจากอาหารชิ้นแรกเสมอ ป้องกันออเดอร์เด้งไปร้านผิด
     if (items.length > 0) {
@@ -500,27 +530,24 @@ app.post('/api/orders', async (req, res) => {
     }
     payload.total_amount = amount;
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-
+    // ถ้าจ่ายด้วยกระเป๋าเงิน ให้ตรวจสอบยอดและหักเงินแบบ atomic
     if (paymentMethod === 'wallet') {
-      const [wallets] = await conn.query('SELECT * FROM wallets WHERE user_id = ? FOR UPDATE', [userId]);
+      const [wallets] = await pool.query('SELECT id, balance FROM wallets WHERE user_id = ?', [userId]);
       if (wallets.length === 0 || Number(wallets[0].balance) < amount) {
-        await conn.rollback();
         return res.status(400).json({
           success: false,
           message: 'ยอดเงินคงเหลือในกระเป๋าไม่เพียงพอสำหรับการสั่งซื้อ'
         });
       }
 
-      const wallet = wallets[0];
-      await conn.query('UPDATE wallets SET balance = balance - ? WHERE id = ?', [amount, wallet.id]);
+      await pool.query('UPDATE wallets SET balance = balance - ? WHERE user_id = ?', [amount, userId]);
     }
 
+    // สร้างคำสั่งซื้อผ่าน orderRepo
     const orderId = await orderRepo.createOrder(payload);
 
     if (paymentMethod === 'wallet') {
-      const [wallets] = await conn.query('SELECT id FROM wallets WHERE user_id = ?', [userId]);
+      const [wallets] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [userId]);
       if (wallets.length > 0) {
         await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
@@ -530,8 +557,8 @@ app.post('/api/orders', async (req, res) => {
       }
     }
 
-    await conn.query('DELETE FROM carts WHERE user_id = ?', [userId]);
-    await conn.commit();
+    // ล้างตะกร้าสินค้าในฐานข้อมูล
+    await pool.query('DELETE FROM carts WHERE user_id = ?', [userId]);
 
     res.json({
       success: true,
@@ -539,14 +566,11 @@ app.post('/api/orders', async (req, res) => {
       orderId: orderId
     });
   } catch (error) {
-    if (conn) await conn.rollback();
     console.error('Create Order Error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'บันทึกคำสั่งซื้อไม่สำเร็จ'
     });
-  } finally {
-    if (conn) conn.release();
   }
 });
 
@@ -903,39 +927,6 @@ app.get('/noodles.html', (req, res) => sendHtmlFile(res, 'noodles.html'));
 // Dynamic Port Binding
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
-
-// เส้นทางพิเศษสำหรับรีเซ็ตและล้างข้อมูลออเดอร์เก่าทิ้งทั้งหมด
-app.get('/api/admin/reset-orders', async (req, res) => {
-  try {
-    const pool = db.getPool();
-    // 1. ล้างรายการอาหารในออเดอร์
-    await pool.query('DELETE FROM order_items');
-    // 2. ล้างหัวบิลคำสั่งซื้อ
-    await pool.query('DELETE FROM orders');
-    // 3. ล้างตะกร้าสินค้า
-    await pool.query('DELETE FROM carts');
-    // 4. ล้างประวัติธุรกรรม Wallet ที่ผูกกับออเดอร์
-    await pool.query('DELETE FROM wallet_transactions WHERE order_id IS NOT NULL');
-    
-    // รีเซ็ตเลขรันบิลเริ่มต้นใหม่ที่ 1 (ถ้า MySQL รองรับ)
-    try {
-      await pool.query('ALTER TABLE order_items AUTO_INCREMENT = 1');
-      await pool.query('ALTER TABLE orders AUTO_INCREMENT = 1');
-    } catch (e) {}
-
-    res.send(`
-      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #10b981;">✅ ล้างข้อมูลคำสั่งซื้อเก่าทั้งหมดเรียบร้อยแล้ว!</h1>
-        <p>ตาราง orders, order_items และ carts สะอาดหมดจดแล้ว</p>
-        <a href="/order.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: bold;">กลับไปหน้าคำสั่งซื้อ</a>
-      </div>
-    `);
-  } catch (err) {
-    console.error('Reset Orders Error:', err);
-    res.status(500).send(`เกิดข้อผิดพลาด: ${err.message}`);
-  }
-});
-
 
 app.listen(PORT, HOST, async () => {
   console.log('----------------------------------------------------');
