@@ -904,6 +904,39 @@ app.get('/noodles.html', (req, res) => sendHtmlFile(res, 'noodles.html'));
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
+// เส้นทางพิเศษสำหรับรีเซ็ตและล้างข้อมูลออเดอร์เก่าทิ้งทั้งหมด
+app.get('/api/admin/reset-orders', async (req, res) => {
+  try {
+    const pool = db.getPool();
+    // 1. ล้างรายการอาหารในออเดอร์
+    await pool.query('DELETE FROM order_items');
+    // 2. ล้างหัวบิลคำสั่งซื้อ
+    await pool.query('DELETE FROM orders');
+    // 3. ล้างตะกร้าสินค้า
+    await pool.query('DELETE FROM carts');
+    // 4. ล้างประวัติธุรกรรม Wallet ที่ผูกกับออเดอร์
+    await pool.query('DELETE FROM wallet_transactions WHERE order_id IS NOT NULL');
+    
+    // รีเซ็ตเลขรันบิลเริ่มต้นใหม่ที่ 1 (ถ้า MySQL รองรับ)
+    try {
+      await pool.query('ALTER TABLE order_items AUTO_INCREMENT = 1');
+      await pool.query('ALTER TABLE orders AUTO_INCREMENT = 1');
+    } catch (e) {}
+
+    res.send(`
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1 style="color: #10b981;">✅ ล้างข้อมูลคำสั่งซื้อเก่าทั้งหมดเรียบร้อยแล้ว!</h1>
+        <p>ตาราง orders, order_items และ carts สะอาดหมดจดแล้ว</p>
+        <a href="/order.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; border-radius: 6px; text-decoration: none; font-weight: bold;">กลับไปหน้าคำสั่งซื้อ</a>
+      </div>
+    `);
+  } catch (err) {
+    console.error('Reset Orders Error:', err);
+    res.status(500).send(`เกิดข้อผิดพลาด: ${err.message}`);
+  }
+});
+
+
 app.listen(PORT, HOST, async () => {
   console.log('----------------------------------------------------');
   console.log(`🚀 Platform พร้อมทำงานแล้วที่ Port ${PORT}`);
