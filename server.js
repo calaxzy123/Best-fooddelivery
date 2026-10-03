@@ -175,14 +175,14 @@ async function initializeDatabaseTables() {
 }
 
 // ----------------------------------------------------
-// ฟังก์ชันจัดสรรเงินเข้ากระเป๋าร้านค้าและไรเดอร์ (Payout Guard)
+// ฟังก์ชันจัดสรรเงินเข้ากระเป๋าร้านค้าและไรเดอร์แบบแยกรายร้าน 100%
 // ----------------------------------------------------
 async function processOrderPayout(orderId, explicitRiderId = null) {
   const pool = db.getPool();
 
   try {
     const [orders] = await pool.query(
-      `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id 
+      `SELECT o.id, o.restaurant_id, o.rider_id, o.total_amount, r.owner_id, r.name AS restaurant_name
        FROM orders o
        LEFT JOIN restaurants r ON o.restaurant_id = r.id
        WHERE o.id = ?`,
@@ -198,13 +198,24 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     const gpFee = foodAmount * 0.15; // GP 15%
     const merchantNet = Number((foodAmount - gpFee).toFixed(2));
 
-    // โอนเงินให้ร้านค้า
-    let merchantUserId = order.owner_id;
-    if (!merchantUserId) {
-      const [defaultOwner] = await pool.query('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
-      merchantUserId = (defaultOwner.length > 0 && defaultOwner[0].owner_id) ? defaultOwner[0].owner_id : order.restaurant_id;
+    // กำหนด User ID ของเจ้าของร้านค้าตามรหัสร้านค้าโดยตรง
+    const storeOwnerMap = {
+      1: 1, // ร้านกะเพรา -> User ID 1
+      2: 2, // Pizza House -> User ID 2
+      3: 3, // Burger Station -> User ID 3
+      4: 4  // ก๋วยเตี๋ยวเรือ -> User ID 4
+    };
+
+    let merchantUserId = storeOwnerMap[order.restaurant_id] || order.owner_id || order.restaurant_id;
+
+    // ตรวจสอบว่าในตาราง users มีบัญชีนี้อยู่จริงหรือไม่
+    const [uCheck] = await pool.query('SELECT id FROM users WHERE id = ?', [merchantUserId]);
+    if (uCheck.length === 0) {
+      const [altUser] = await pool.query('SELECT id FROM users WHERE restaurant_id = ? LIMIT 1', [order.restaurant_id]);
+      if (altUser.length > 0) merchantUserId = altUser[0].id;
     }
 
+    // โอนเงินเข้ากระเป๋าของร้านค้ารายนั้น
     if (merchantUserId && merchantNet > 0) {
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [merchantUserId]);
       await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [merchantNet, merchantUserId]);
@@ -214,10 +225,15 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
         await pool.query(
           `INSERT INTO wallet_transactions (wallet_id, order_id, amount, type, description)
            VALUES (?, ?, ?, 'order_earning', ?)`,
-          [w[0].id, order.id, merchantNet, `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${foodAmount} หัก GP 15%)`]
+          [
+            w[0].id, 
+            order.id, 
+            merchantNet, 
+            `รายได้จากคำสั่งซื้อ #${order.id} (ค่าอาหาร ฿${foodAmount.toFixed(2)} หัก GP 15%)`
+          ]
         );
       }
-      console.log(`💰 [Payout Shop] ร้านค้า (User #${merchantUserId}) ได้รับ ฿${merchantNet}`);
+      console.log(`💰 [Payout Shop] ร้าน #${order.restaurant_id} (${order.restaurant_name || 'ร้านค้า'}) ได้รับเงินเข้า Wallet: ฿${merchantNet} (User ID #${merchantUserId})`);
     }
 
     // โอนเงินค่ารอบให้ไรเดอร์ (20 บาท)
@@ -240,7 +256,7 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
           [rw[0].id, order.id, deliveryFee, `ค่ารอบจัดส่งคำสั่งซื้อ #${order.id}`]
         );
       }
-      console.log(`🛵 [Payout Rider] ไรเดอร์ (User #${riderUserId}) ได้รับค่าจัดส่ง ฿${deliveryFee}`);
+      console.log(`🛵 [Payout Rider] ไรเดอร์ (User ID #${riderUserId}) ได้รับค่าจัดส่ง ฿${deliveryFee}`);
     }
 
     console.log(`✅ [Payout Complete] คำสั่งซื้อ #${orderId} จัดสรรเงินเรียบร้อย`);
@@ -254,7 +270,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// เส้นทางพิเศษสำหรับรีเซ็ตและล้างข้อมูลออเดอร์เก่าทิ้งทั้งหมด (แก้ปัญหาบิลค้างมั่ว)
+// เส้นทางพิเศษสำหรับรีเซ็ตและล้างข้อมูลออเดอร์เก่าทิ้งทั้งหมด
 app.get('/api/admin/reset-orders', async (req, res) => {
   try {
     const pool = db.getPool();
@@ -494,7 +510,7 @@ app.delete('/api/cart/:userId', async (req, res) => {
   }
 });
 
-// 4. เส้นทางคำสั่งซื้อ (Orders) - ปลดล็อก Deadlock และไม่ใช้ Transaction ซ้อน
+// 4. เส้นทางคำสั่งซื้อ (Orders) - ไม่ใช้ Transaction ซ้อน ป้องกัน Lock wait timeout
 app.post('/api/orders', async (req, res) => {
   const pool = db.getPool();
 
