@@ -173,7 +173,7 @@ async function initializeDatabaseTables() {
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [uid]);
     }
 
-    console.log('✅ [Database] ตารางและกระเป๋าเงินพร้อมใช้งานสมบูรณ์');
+    console.log('✅ [Database] โครงสร้างตารางและข้อมูลระบบพร้อมใช้งานสมบูรณ์');
   } catch (err) {
     console.error('⚠ [Database Init Notice]:', err.message);
   }
@@ -231,7 +231,6 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
       }
     });
 
-    // หากไม่มีรายการใน order_items ให้ใช้ยอดรวมหักค่าส่ง 20 บาท เข้าเฉพาะร้านที่อยู่บนหัวบิล
     const hasItems = Object.values(storeRevenue).some(v => v > 0);
     if (!hasItems && headerStoreId >= 1 && headerStoreId <= 4) {
       storeRevenue[headerStoreId] = Math.max(0, Number(order.total_amount || 0) - 20.00);
@@ -240,19 +239,18 @@ async function processOrderPayout(orderId, explicitRiderId = null) {
     const gpRate = 0.15; // หัก GP 15%
     const deliveryFee = 20.00;
 
-    // 3. จัดสรรเงินให้ร้านค้าตามยอดอาหารจริง
+    // 3. จัดสรรเงินให้ร้านค้าที่ขายอาหารได้ในบิลนี้
     for (const [storeIdStr, foodTotal] of Object.entries(storeRevenue)) {
       const storeId = Number(storeIdStr);
       if (foodTotal <= 0) continue;
 
       const merchantNet = Number((foodTotal * (1 - gpRate)).toFixed(2));
 
-      // ตรวจสอบกระเป๋าเงินของร้านค้านี้
       await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [storeId]);
       const [wRows] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [storeId]);
       const actualWalletId = wRows[0].id;
 
-      // Idempotency Guard ป้องกันจ่ายซ้ำ
+      // ตรวจสอบ Idempotency Guard ป้องกันจ่ายเงินซ้ำให้ร้านค้า
       const [existingShopPayout] = await pool.query(
         `SELECT id FROM wallet_transactions 
          WHERE order_id = ? AND wallet_id = ? AND type = 'order_earning' LIMIT 1`,
@@ -350,7 +348,7 @@ app.get('/api/admin/reset-wallets-audit', async (req, res) => {
 
     // 1. เคลียร์กระเป๋าเงินและประวัติธุรกรรมเดิมทั้งหมด
     await pool.query('UPDATE wallets SET balance = 0.00');
-    await pool.query("DELETE FROM wallet_transactions WHERE type IN ('order_earning', 'delivery_fee')");
+    await pool.query("DELETE FROM wallet_transactions WHERE type IN ('order_earning', 'delivery_fee', 'merchant_withdraw')");
 
     // 2. ดึงคำสั่งซื้อที่ส่งสำเร็จแล้วทั้งหมด
     const [doneOrders] = await pool.query(`
@@ -629,7 +627,7 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน กรุณาล็อกอินใหม่' });
     }
 
-    // กำหนด restaurant_id ให้ตรงกับเมนูอาหารจริง
+    // กำหนด restaurant_id จาก Food ID ชัดเจน
     if (items.length > 0) {
       const firstFoodId = Number(items[0].food_id || items[0].id);
       if (firstFoodId >= 1 && firstFoodId <= 4) payload.restaurant_id = 1;
@@ -884,31 +882,76 @@ app.patch('/api/orders/:id/status', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------
 // 9. ระบบกระเป๋าเงิน (Wallet, Top-up & Withdrawal)
-// ดึงยอดเงินเฉพาะ ID นั้นๆ ตรงไปตรงมา (1: กะเพรา, 2: Pizza, 3: Burger, 4: ก๋วยเตี๋ยว, 5: ไรเดอร์)
+// คำนวณยอดเงินร้านค้า 1-4 จากยอดขายจริงของบิล completed ลบด้วยยอดที่ถอนไปแล้ว 100%
+// ----------------------------------------------------
 const handleWalletFetch = async (req, res) => {
   try {
     const pool = db.getPool();
     const targetId = Number(req.params.userId);
 
-    // ตรวจสอบกระเป๋าเงิน
-    await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [targetId]);
-    let [wallets] = await pool.query('SELECT id, balance FROM wallets WHERE user_id = ?', [targetId]);
+    // หากเป็นร้านค้า 1-4 ให้คำนวณสดจากอาหารจริงของร้านนั้น ป้องกันเงินปนกันเด็ดขาด
+    if (targetId >= 1 && targetId <= 4) {
+      const [orderRows] = await pool.query(`
+        SELECT oi.food_id, oi.price, oi.quantity, f.restaurant_id AS food_rest_id
+        FROM orders o
+        JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN foods f ON oi.food_id = f.id
+        WHERE o.status IN ('completed', 'delivered', 'done', 'จัดส่งสำเร็จ')
+      `);
 
-    const wallet = wallets[0];
-    const currentBalance = wallet ? wallet.balance : "0.00";
-    const walletPk = wallet ? wallet.id : targetId;
+      let totalFoodSales = 0;
+      orderRows.forEach(it => {
+        const fId = Number(it.food_id);
+        let store = 0;
+        if (fId >= 1 && fId <= 4) store = 1;
+        else if (fId >= 5 && fId <= 7) store = 2;
+        else if (fId >= 8 && fId <= 10) store = 3;
+        else if (fId >= 11 && fId <= 13) store = 4;
+        else store = Number(it.food_rest_id || 1);
+
+        if (store === targetId) {
+          totalFoodSales += Number(it.price || 0) * Number(it.quantity || 1);
+        }
+      });
+
+      const netIncome = totalFoodSales * 0.85; // หัก GP 15%
+
+      // หักยอดที่ร้านเคยกดถอน
+      const [withdrawRows] = await pool.query(
+        `SELECT COALESCE(SUM(ABS(amount)), 0) AS total_withdraw 
+         FROM wallet_transactions 
+         WHERE wallet_id = ? AND type = 'merchant_withdraw'`,
+        [targetId]
+      );
+      const totalWithdrawn = Number(withdrawRows[0]?.total_withdraw || 0);
+      const currentBalance = Math.max(0, netIncome - totalWithdrawn);
+
+      const [txs] = await pool.query(
+        `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
+        [targetId]
+      );
+
+      return res.json({
+        success: true,
+        balance: currentBalance.toFixed(2),
+        transactions: txs
+      });
+    }
+
+    // สำหรับ User ทั่วไป หรือไรเดอร์
+    let [wallets] = await pool.query('SELECT balance FROM wallets WHERE user_id = ?', [targetId]);
+    const balance = wallets.length > 0 ? Number(wallets[0].balance || 0).toFixed(2) : "0.00";
 
     const [txs] = await pool.query(
-      `SELECT * FROM wallet_transactions 
-       WHERE wallet_id = ?
-       ORDER BY created_at DESC LIMIT 20`,
-      [walletPk]
+      `SELECT * FROM wallet_transactions WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 20`,
+      [targetId]
     );
 
     res.json({
       success: true,
-      balance: currentBalance,
+      balance: balance,
       transactions: txs
     });
   } catch (err) {
@@ -935,13 +978,10 @@ const handleWalletTopup = async (req, res) => {
     await pool.query('INSERT IGNORE INTO wallets (user_id, balance) VALUES (?, 0.00)', [uid]);
     await pool.query('UPDATE wallets SET balance = balance + ? WHERE user_id = ?', [topupAmount, uid]);
 
-    const [w] = await pool.query('SELECT id FROM wallets WHERE user_id = ?', [uid]);
-    const walletPk = w[0].id;
-
     await pool.query(
       `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
        VALUES (?, ?, 'topup', ?)`,
-      [walletPk, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
+      [uid, topupAmount, `เติมเงินเข้ากระเป๋าสำเร็จ จำนวน ${topupAmount.toFixed(2)} บาท`]
     );
 
     res.json({ success: true, message: `เติมเงินสำเร็จ ฿${topupAmount.toFixed(2)}` });
@@ -954,7 +994,7 @@ const handleWalletTopup = async (req, res) => {
 app.post('/api/wallet/topup', handleWalletTopup);
 app.post('/wallet/topup', handleWalletTopup);
 
-// ถอนเงินออกจากกระเป๋า (หักตรงตาม ID ร้าน 1, 2, 3, 4)
+// ถอนเงินออกจากกระเป๋า (แยกตามร้าน 1, 2, 3, 4 แบบเด็ดขาด)
 const handleWalletWithdraw = async (req, res) => {
   const pool = db.getPool();
 
@@ -967,8 +1007,67 @@ const handleWalletWithdraw = async (req, res) => {
       return res.status(400).json({ success: false, message: 'กรุณาระบุจำนวนเงินที่ถูกต้อง' });
     }
 
-    let [wallets] = await pool.query('SELECT id, user_id, balance FROM wallets WHERE user_id = ?', [targetId]);
+    if (targetId >= 1 && targetId <= 4) {
+      // ตรวจสอบยอดเงินคงเหลือจริงของร้าน
+      const [orderRows] = await pool.query(`
+        SELECT oi.food_id, oi.price, oi.quantity, f.restaurant_id AS food_rest_id
+        FROM orders o
+        JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN foods f ON oi.food_id = f.id
+        WHERE o.status IN ('completed', 'delivered', 'done', 'จัดส่งสำเร็จ')
+      `);
 
+      let totalFoodSales = 0;
+      orderRows.forEach(it => {
+        const fId = Number(it.food_id);
+        let store = 0;
+        if (fId >= 1 && fId <= 4) store = 1;
+        else if (fId >= 5 && fId <= 7) store = 2;
+        else if (fId >= 8 && fId <= 10) store = 3;
+        else if (fId >= 11 && fId <= 13) store = 4;
+        else store = Number(it.food_rest_id || 1);
+
+        if (store === targetId) {
+          totalFoodSales += Number(it.price || 0) * Number(it.quantity || 1);
+        }
+      });
+
+      const netIncome = totalFoodSales * 0.85;
+
+      const [withdrawRows] = await pool.query(
+        `SELECT COALESCE(SUM(ABS(amount)), 0) AS total_withdraw 
+         FROM wallet_transactions 
+         WHERE wallet_id = ? AND type = 'merchant_withdraw'`,
+        [targetId]
+      );
+      const totalWithdrawn = Number(withdrawRows[0]?.total_withdraw || 0);
+      const currentBalance = Math.max(0, netIncome - totalWithdrawn);
+
+      if (currentBalance < withdrawAmount) {
+        return res.status(400).json({
+          success: false,
+          message: `ยอดเงินคงเหลือไม่เพียงพอ (คงเหลือ: ฿${currentBalance.toFixed(2)})`
+        });
+      }
+
+      const bankDesc = bank_name && account_no 
+        ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
+        : `ถอนเงินเข้าบัญชีธนาคาร จำนวน ฿${withdrawAmount.toFixed(2)}`;
+
+      await pool.query(
+        `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
+         VALUES (?, ?, 'merchant_withdraw', ?)`,
+        [targetId, -withdrawAmount, bankDesc]
+      );
+
+      return res.json({
+        success: true,
+        message: `ถอนเงินสำเร็จ ฿${withdrawAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} โอนเข้าบัญชีเรียบร้อยแล้ว`
+      });
+    }
+
+    // กรณี User ทั่วไป หรือไรเดอร์
+    let [wallets] = await pool.query('SELECT balance FROM wallets WHERE user_id = ?', [targetId]);
     const currentBal = wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
 
     if (wallets.length === 0 || currentBal < withdrawAmount) {
@@ -978,10 +1077,7 @@ const handleWalletWithdraw = async (req, res) => {
       });
     }
 
-    const primaryWallet = wallets[0];
-
-    // หักเงินออกจากกระเป๋าตรงจุด
-    await pool.query('UPDATE wallets SET balance = balance - ? WHERE id = ?', [withdrawAmount, primaryWallet.id]);
+    await pool.query('UPDATE wallets SET balance = balance - ? WHERE user_id = ?', [withdrawAmount, targetId]);
 
     const bankDesc = bank_name && account_no 
       ? `ถอนเงินเข้าบัญชี ${bank_name} (${account_no}) จำนวน ฿${withdrawAmount.toFixed(2)}`
@@ -990,10 +1086,8 @@ const handleWalletWithdraw = async (req, res) => {
     await pool.query(
       `INSERT INTO wallet_transactions (wallet_id, amount, type, description)
        VALUES (?, ?, 'withdraw', ?)`,
-      [primaryWallet.id, -withdrawAmount, bankDesc]
+      [targetId, -withdrawAmount, bankDesc]
     );
-
-    console.log(`💸 [Withdraw Success] ร้านค้า/ผู้ใช้ #${targetId} ถอนเงินสำเร็จ: ฿${withdrawAmount}`);
 
     return res.json({ 
       success: true, 
